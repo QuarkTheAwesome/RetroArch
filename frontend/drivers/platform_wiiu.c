@@ -51,6 +51,7 @@
 #include <sys/iosupport.h>
 
 #include <wiiu/os/foreground.h>
+#include <wiiu/os/debug.h>
 #include <wiiu/gx2/event.h>
 #include <wiiu/procui.h>
 #include <wiiu/sysapp.h>
@@ -343,6 +344,10 @@ void wiiu_log_deinit(void)
 }
 static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_t len)
 {
+   char outbuf[len + 1];
+   snprintf(outbuf, len, "%s", ptr);
+   OSReport(outbuf);
+
    if (wiiu_log_socket < 0)
       return len;
 
@@ -376,6 +381,7 @@ void net_print(const char *str)
 
 void net_print_exp(const char *str)
 {
+   OSReport(str);
    send(wiiu_log_socket, str, strlen(str), 0);
 }
 
@@ -417,8 +423,7 @@ int main(int argc, char **argv)
 #endif
 #if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
    wiiu_log_init(PC_DEVELOPMENT_IP_ADDRESS, PC_DEVELOPMENT_TCP_PORT);
-   devoptab_list[STD_OUT] = &dotab_stdout;
-   devoptab_list[STD_ERR] = &dotab_stdout;
+
 #endif
 #ifndef IS_SALAMANDER
    VPADInit();
@@ -428,10 +433,10 @@ int main(int argc, char **argv)
 #endif
    verbosity_enable();
 #ifndef IS_SALAMANDER
-   ControllerPatcherInit();
+   //ControllerPatcherInit();
 #endif
    fflush(stdout);
-   DEBUG_VAR(ARGV_PTR);
+   /*DEBUG_VAR(ARGV_PTR);
    if(ARGV_PTR && ((u32)ARGV_PTR < 0x01000000))
    {
       struct
@@ -446,11 +451,13 @@ int main(int argc, char **argv)
          argv = param->argv;
       }
       ARGV_PTR = NULL;
-   }
+   }*/
 
    DEBUG_VAR(argc);
-   DEBUG_STR(argv[0]);
-   DEBUG_STR(argv[1]);
+   if (argc > 1) {
+      DEBUG_STR(argv[0]);
+      DEBUG_STR(argv[1]);
+   }
    fflush(stdout);
 #ifdef IS_SALAMANDER
    int salamander_main(int, char **);
@@ -490,7 +497,7 @@ int main(int argc, char **argv)
    }
    while (1);
 #ifndef IS_SALAMANDER
-   ControllerPatcherDeInit();
+   //ControllerPatcherDeInit();
 #endif
    main_exit(NULL);
 #endif
@@ -591,8 +598,8 @@ static void fsdev_init(void)
    iosuhaxMount = 0;
    int res = IOSUHAX_Open(NULL);
 
-   if (res < 0)
-      res = MCPHookOpen();
+   //if (res < 0)
+      //res = MCPHookOpen();
 
    if (res < 0)
       mount_sd_fat("sd");
@@ -609,9 +616,9 @@ static void fsdev_exit(void)
       fatUnmount("sd:");
       fatUnmount("usb:");
 
-      if (mcp_hook_fd >= 0)
-         MCPHookClose();
-      else
+      //if (mcp_hook_fd >= 0)
+         //MCPHookClose();
+      //else
          IOSUHAX_Close();
    }
    else
@@ -638,6 +645,8 @@ int __entry_menu(int argc, char **argv)
 __attribute__((noreturn))
 void _start(int argc, char **argv)
 {
+   devoptab_list[STD_OUT] = &dotab_stdout;
+   devoptab_list[STD_ERR] = &dotab_stdout;
    memoryInitialize();
    __init();
    fsdev_init();

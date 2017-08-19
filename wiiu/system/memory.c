@@ -16,14 +16,32 @@
  ****************************************************************************/
 #include <malloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include "memory.h"
 #include <wiiu/mem.h>
+#include <wiiu/os.h>
+
+/* Leak detection! Woo! */
+typedef struct _lsan_allocation {
+   bool allocated;
+   void* addr;
+   size_t size;
+   void* owner;
+} lsan_allocation;
+#define LSAN_ALLOCS_SZ 0x10000
+static lsan_allocation lsan_allocs[LSAN_ALLOCS_SZ];
+void net_print(const char *str);
 
 static MEMExpandedHeap* mem1_heap;
 static MEMExpandedHeap* bucket_heap;
 
 void memoryInitialize(void)
 {
+    for (int i = 0; i < LSAN_ALLOCS_SZ; i++) {
+       lsan_allocs[i].allocated = false;
+    }
+    net_print("[LSAN] LSAN initialized\n");
     MEMHeapHandle mem1_heap_handle = MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM1);
     unsigned int mem1_allocatable_size = MEMGetAllocatableSizeForFrmHeapEx(mem1_heap_handle, 4);
     void *mem1_memory = MEMAllocFromFrmHeapEx(mem1_heap_handle, mem1_allocatable_size, 4);
@@ -39,6 +57,14 @@ void memoryInitialize(void)
 
 void memoryRelease(void)
 {
+    for (int i = 0; i < LSAN_ALLOCS_SZ; i++) {
+        if (lsan_allocs[i].allocated) {
+           char buf[255];
+           __os_snprintf(buf, 255, "[LSAN] Memory leak: %08X bytes at %08X; owner %08X\n", lsan_allocs[i].size, lsan_allocs[i].addr, lsan_allocs[i].owner);
+           net_print(buf);
+           break;
+        }
+    }
     MEMDestroyExpHeap(mem1_heap);
     MEMFreeToFrmHeap(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM1), MEM_FRAME_HEAP_FREE_ALL);
     mem1_heap = NULL;
@@ -50,7 +76,30 @@ void memoryRelease(void)
 
 void* _memalign_r(struct _reent *r, size_t alignment, size_t size)
 {
-   return MEMAllocFromExpHeapEx(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), size, alignment);
+   void* ptr = MEMAllocFromExpHeapEx(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), size, alignment);
+
+   if (!ptr) return 0;
+
+   bool lsan_ok = false;
+   for (int i = 0; i < LSAN_ALLOCS_SZ; i++) {
+      if (!lsan_allocs[i].allocated) {
+         lsan_allocs[i].allocated = true;
+         lsan_allocs[i].addr = ptr;
+         lsan_allocs[i].size = size;
+         lsan_allocs[i].owner = __builtin_return_address(0);
+         lsan_ok = true;
+         /*char buf[255];
+         __os_snprintf(buf, 255, "[LSAN] Saved alloc %08X, sz %08X\n", ptr, size);
+         net_print(buf);*/
+         break;
+      }
+   }
+
+   if (!lsan_ok) {
+      net_print("[LSAN] WARNING: Too many allocs!\n");
+   }
+
+   return ptr;
 }
 
 void* _malloc_r(struct _reent *r, size_t size)
@@ -61,6 +110,24 @@ void* _malloc_r(struct _reent *r, size_t size)
 void _free_r(struct _reent *r, void *ptr)
 {
    if (ptr) {
+      bool lsan_ok = false;
+      for (int i = 0; i < LSAN_ALLOCS_SZ; i++) {
+         if (lsan_allocs[i].allocated && lsan_allocs[i].addr == ptr) {
+            lsan_allocs[i].allocated = false;
+            lsan_ok = true;
+            /*char buf[255];
+            __os_snprintf(buf, 255, "[LSAN] Freed %08X, sz %08X\n", lsan_allocs[i].addr, lsan_allocs[i].size);
+            net_print(buf);*/
+            break;
+         }
+      }
+
+      if (!lsan_ok) {
+         char buf[255];
+         __os_snprintf(buf, 255, "[LSAN] WARNING: freed %08X; not in table!\n", ptr);
+         net_print(buf);
+      }
+
       MEMFreeToExpHeap(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), ptr);
    }
 }
@@ -111,13 +178,15 @@ void * _valloc_r(struct _reent *r, size_t size)
 //!-------------------------------------------------------------------------------------------
 void * MEM2_alloc(unsigned int size, unsigned int align)
 {
-    return MEMAllocFromExpHeapEx(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), size, align);
+    return _memalign_r(NULL, align, size);
+    //return MEMAllocFromExpHeapEx(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), size, align);
 }
 
 void MEM2_free(void *ptr)
 {
    if (ptr)
-      MEMFreeToExpHeap(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), ptr);
+      _free_r(NULL, ptr);
+      //MEMFreeToExpHeap(MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2), ptr);
 }
 
 void * MEM1_alloc(unsigned int size, unsigned int align)

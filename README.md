@@ -1,3 +1,10 @@
+# What's this?
+This is a branch of RetroArch, with the goal of trying to get something similar to ASAN on the Wii U. At this point, it contains a leak sanitizer (LSAN) hacked into memory.c.
+
+There's no intention for this to ever go upstream, so the code quality is *crap*. There's also some hacks in here to get RetroArch to run under Decaf.
+
+(To run this under Decaf, you have to stub the rest of the socket functions in the emulator.)
+
 [![Build Status](https://travis-ci.org/libretro/RetroArch.svg?branch=master)](https://travis-ci.org/libretro/RetroArch)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/8936/badge.svg)](https://scan.coverity.com/projects/retroarch)
 

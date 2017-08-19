@@ -2,6 +2,7 @@
 IMPORT_BEGIN(coreinit);
 
 IMPORT(OSFatal);
+IMPORT(OSReport);
 IMPORT(OSDynLoad_Acquire);
 IMPORT(OSDynLoad_FindExport);
 IMPORT(OSDynLoad_Release);
