@@ -1419,6 +1419,8 @@ static bool command_event_save_core_config(void)
    size_t config_size              = PATH_MAX_LENGTH * sizeof(char);
    settings_t *settings            = config_get_ptr();
 
+   RARCH_LOG("gblues: msg = %x", msg);
+
    config_dir[0]  = config_name[0] =
    config_path[0] = msg[0]         = '\0';
 
@@ -1492,6 +1494,7 @@ static bool command_event_save_core_config(void)
       rarch_ctl(RARCH_CTL_UNSET_OVERRIDES_ACTIVE, NULL);
       overrides_active = true;
    }
+   RARCH_LOG("gblues: going into command_event_save_config, msg = %x", msg);
 
    command_event_save_config(config_path, msg, sizeof(msg));
 
