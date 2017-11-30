@@ -90,23 +90,22 @@ void __attribute__((__noreturn__)) exception_cb(OSContext* ctx, OSExceptionType 
 
 /*	First up, the pretty header that tells you wtf just happened */
 	if (type == OS_EXCEPTION_TYPE_DSI) {
-	/*	Exception type and offending instruction location
-		Also initializes exception_msgbuf, use buf_add from now on */
-		buf_add("DSI: Instr at %08" PRIX32, ctx->srr0);
+	/*	Exception type and offending instruction location + opcode */
+		buf_add("DSI: Instr at %08" PRIX32 " (%08 " PRIX32 ")", ctx->srr0, *(unsigned int*)(ctx->srr0));
 	/*	Was this a read or a write? */
 		if (ctx->dsisr & DSISR_WRITE_ATTEMPTED) {
-			buf_add(" bad write to");
+			buf_add(" bad wr:");
 		} else {
-			buf_add(" bad read from");
+			buf_add(" bad rd:");
 		}
 	/*	So why was it bad?
 		Other causes (DABR) don't have a message to go with them. */
 		if (ctx->dsisr & DSISR_TRANSLATION_MISS) {
-			buf_add(" unmapped memory at");
+			buf_add(" unmapped memory:");
 		} else if (ctx->dsisr & DSISR_TRANSLATION_PROT) {
-			buf_add(" protected memory at");
+			buf_add(" protected memory:");
 		} else if (ctx->dsisr & DSISR_BAD_CACHING) {
-			buf_add(" uncached memory at");
+			buf_add(" uncached memory:");
 		}
 		buf_add(" %08" PRIX32 "\n", ctx->dar);
 	} else if (type == OS_EXCEPTION_TYPE_ISI) {
@@ -216,6 +215,12 @@ void exception_print_symbol(uint32_t addr) {
 		/*	Try for a base address */
 			void* libAddr;
 			OSDynLoad_Acquire(symbolName, &libAddr);
+		/*	Special case for coreinit; which has broken handles */
+			if (!strcmp(symbolName, "coreinit.rpl")) {
+				void* PPCExit_addr;
+				OSDynLoad_FindExport(libAddr, 0, "__PPCExit", &PPCExit_addr);
+				libAddr = PPCExit_addr - 0x180;
+			}
 			*seperator = '|';
 		/*	We got one! */
 			if (libAddr) {

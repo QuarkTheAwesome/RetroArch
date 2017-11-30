@@ -1,9 +1,10 @@
 TARGET		    := retroarch_wiiu
 BUILD_HBL_ELF	     = 1
-BUILD_RPX	         = 1
+BUILD_RPX	     = 1
 DEBUG                = 0
 GRIFFIN_BUILD        = 0
 WHOLE_ARCHIVE_LINK   = 0
+HAVE_FILE_LOGGER     = 1
 
 ifneq ($(V), 1)
    Q := @
@@ -145,6 +146,11 @@ ifeq ($(DEBUG), 1)
 else
    CFLAGS += -O3
 endif
+
+ifeq ($(HAVE_FILE_LOGGER), 1)
+   CFLAGS += -DHAVE_FILE_LOGGER
+endif
+
 LDFLAGS := $(CFLAGS)
 
 ASFLAGS := $(CFLAGS) -mregnames

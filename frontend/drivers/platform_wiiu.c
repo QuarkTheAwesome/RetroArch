@@ -84,6 +84,16 @@ static void frontend_wiiu_get_environment_settings(int *argc, char *argv[],
    unsigned i;
    (void)args;
 
+#if defined(HAVE_FILE_LOGGER)
+   char buf[128];
+   // the file stream doesn't have an "append" mode, so I need it to
+   // randomly generate part of the filename. This should suffice for
+   // debugging; I think the risk of getting the same number more than once
+   // in a row is pretty low.
+   sprintf(buf, "sd:/retroarch/retroarch.log.%d", rand());
+   retro_main_log_file_init(buf);
+#endif
+
    fill_pathname_basedir(g_defaults.dirs[DEFAULT_DIR_PORT], elf_path_cst, sizeof(g_defaults.dirs[DEFAULT_DIR_PORT]));
 
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_CORE_ASSETS], g_defaults.dirs[DEFAULT_DIR_PORT],
