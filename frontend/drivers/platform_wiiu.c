@@ -49,17 +49,14 @@
 #include "system/memory.h"
 #include "system/exception_handler.h"
 #include <sys/iosupport.h>
-
+#include <wiiu/syshid.h>
 #include <wiiu/os/foreground.h>
-#include <wiiu/os/debug.h>
 #include <wiiu/gx2/event.h>
 #include <wiiu/procui.h>
 #include <wiiu/sysapp.h>
 #include <wiiu/ios.h>
 #include <wiiu/vpad.h>
 #include <wiiu/kpad.h>
-
-#include "wiiu/controller_patcher/ControllerPatcherWrapper.h"
 
 #include <fat.h>
 #include <iosuhax.h>
@@ -187,8 +184,8 @@ static void frontend_wiiu_exec(const char *path, bool should_load_game)
       u32 argc;
       char * argv[3];
       char args[];
-   }*param = getApplicationEndAddr();
-   int len = 0;
+   }*param     = getApplicationEndAddr();
+   int len     = 0;
    param->argc = 0;
 
    if(!path || !*path)
@@ -309,6 +306,7 @@ frontend_ctx_driver_t frontend_ctx_wiiu =
    NULL,                         /* attach_console */
    NULL,                         /* detach_console */
    "wiiu",
+   NULL,                         /* get_video_driver */
 };
 
 static int wiiu_log_socket = -1;
@@ -344,10 +342,6 @@ void wiiu_log_deinit(void)
 }
 static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_t len)
 {
-   char outbuf[len + 1];
-   snprintf(outbuf, len, "%s", ptr);
-   OSReport(outbuf);
-
    if (wiiu_log_socket < 0)
       return len;
 
@@ -381,10 +375,10 @@ void net_print(const char *str)
 
 void net_print_exp(const char *str)
 {
-   OSReport(str);
    send(wiiu_log_socket, str, strlen(str), 0);
 }
 
+#if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
 static devoptab_t dotab_stdout =
 {
    "stdout_net", // device name
@@ -395,8 +389,9 @@ static devoptab_t dotab_stdout =
    NULL,
    /* ... */
 };
+#endif
 
-void SaveCallback()
+void SaveCallback(void)
 {
    OSSavesDone_ReadyToRelease();
 }
@@ -423,7 +418,8 @@ int main(int argc, char **argv)
 #endif
 #if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
    wiiu_log_init(PC_DEVELOPMENT_IP_ADDRESS, PC_DEVELOPMENT_TCP_PORT);
-
+   devoptab_list[STD_OUT] = &dotab_stdout;
+   devoptab_list[STD_ERR] = &dotab_stdout;
 #endif
 #ifndef IS_SALAMANDER
    VPADInit();
@@ -432,11 +428,8 @@ int main(int argc, char **argv)
    KPADInit();
 #endif
    verbosity_enable();
-#ifndef IS_SALAMANDER
-   //ControllerPatcherInit();
-#endif
    fflush(stdout);
-   /*DEBUG_VAR(ARGV_PTR);
+   DEBUG_VAR(ARGV_PTR);
    if(ARGV_PTR && ((u32)ARGV_PTR < 0x01000000))
    {
       struct
@@ -451,13 +444,11 @@ int main(int argc, char **argv)
          argv = param->argv;
       }
       ARGV_PTR = NULL;
-   }*/
+   }
 
    DEBUG_VAR(argc);
-   if (argc > 1) {
-      DEBUG_STR(argv[0]);
-      DEBUG_STR(argv[1]);
-   }
+   DEBUG_STR(argv[0]);
+   DEBUG_STR(argv[1]);
    fflush(stdout);
 #ifdef IS_SALAMANDER
    int salamander_main(int, char **);
@@ -496,9 +487,6 @@ int main(int argc, char **argv)
 
    }
    while (1);
-#ifndef IS_SALAMANDER
-   //ControllerPatcherDeInit();
-#endif
    main_exit(NULL);
 #endif
 #endif
@@ -519,7 +507,7 @@ unsigned long _times_r(struct _reent *r, struct tms *tmsbuf)
    return 0;
 }
 
-void __eabi()
+void __eabi(void)
 {
 
 }
@@ -527,22 +515,25 @@ void __eabi()
 __attribute__((weak))
 void __init(void)
 {
-   extern void(*__CTOR_LIST__[])(void);
-   void(**ctor)(void) = __CTOR_LIST__;
+   extern void (*const __CTOR_LIST__)(void);
+   extern void (*const __CTOR_END__)(void);
 
-   while (*ctor)
+   void (*const *ctor)(void) = &__CTOR_LIST__;
+   while (ctor < &__CTOR_END__) {
       (*ctor++)();
+   }
 }
-
 
 __attribute__((weak))
 void __fini(void)
 {
-   extern void(*__DTOR_LIST__[])(void);
-   void(**ctor)(void) = __DTOR_LIST__;
+   extern void (*const __DTOR_LIST__)(void);
+   extern void (*const __DTOR_END__)(void);
 
-   while (*ctor)
-      (*ctor++)();
+   void (*const *dtor)(void) = &__DTOR_LIST__;
+   while (dtor < &__DTOR_END__) {
+      (*dtor++)();
+   }
 }
 
 /* libiosuhax related */
@@ -555,7 +546,7 @@ void someFunc(void *arg)
 
 static int mcp_hook_fd = -1;
 
-int MCPHookOpen()
+int MCPHookOpen(void)
 {
    //take over mcp thread
    mcp_hook_fd = IOS_Open("/dev/mcp", 0);
@@ -577,7 +568,7 @@ int MCPHookOpen()
    return 0;
 }
 
-void MCPHookClose()
+void MCPHookClose(void)
 {
    if (mcp_hook_fd < 0)
       return;
@@ -598,8 +589,8 @@ static void fsdev_init(void)
    iosuhaxMount = 0;
    int res = IOSUHAX_Open(NULL);
 
-   //if (res < 0)
-      //res = MCPHookOpen();
+   if (res < 0)
+      res = MCPHookOpen();
 
    if (res < 0)
       mount_sd_fat("sd");
@@ -616,9 +607,9 @@ static void fsdev_exit(void)
       fatUnmount("sd:");
       fatUnmount("usb:");
 
-      //if (mcp_hook_fd >= 0)
-         //MCPHookClose();
-      //else
+      if (mcp_hook_fd >= 0)
+         MCPHookClose();
+      else
          IOSUHAX_Close();
    }
    else
@@ -629,15 +620,17 @@ static void fsdev_exit(void)
 /* HBL elf entry point */
 int __entry_menu(int argc, char **argv)
 {
+   int ret;
+
    InitFunctionPointers();
    memoryInitialize();
    __init();
    fsdev_init();
 
-   int ret = main(argc, argv);
+   ret = main(argc, argv);
 
    fsdev_exit();
-//   __fini();
+   __fini();
    memoryRelease();
    return ret;
 }
@@ -645,16 +638,17 @@ int __entry_menu(int argc, char **argv)
 __attribute__((noreturn))
 void _start(int argc, char **argv)
 {
-   devoptab_list[STD_OUT] = &dotab_stdout;
-   devoptab_list[STD_ERR] = &dotab_stdout;
    memoryInitialize();
    __init();
    fsdev_init();
-
-   int ret = main(argc, argv);
-
+   main(argc, argv);
    fsdev_exit();
-//   __fini();
+
+   /* TODO: fix elf2rpl so it doesn't error with "Could not find matching symbol
+      for relocation" then uncomment this */
+#if 0
+   __fini();
+#endif
    memoryRelease();
    SYSRelaunchTitle(0, 0);
    exit(0);

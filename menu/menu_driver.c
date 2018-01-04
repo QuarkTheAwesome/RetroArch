@@ -22,6 +22,7 @@
 #include <retro_miscellaneous.h>
 #include <formats/image.h>
 #include <file/file_path.h>
+#include <streams/file_stream.h>
 #include <string/stdstring.h>
 
 #ifdef HAVE_CONFIG_H
@@ -121,7 +122,7 @@ uintptr_t menu_display_white_texture;
 
 static video_coord_array_t menu_disp_ca;
 
-static enum 
+static enum
 menu_toggle_reason menu_display_toggle_reason    = MENU_TOGGLE_REASON_NONE;
 
 /* Width, height and pitch of the menu framebuffer */
@@ -175,7 +176,7 @@ static void *menu_userdata                      = NULL;
 
 /* Quick jumping indices with L/R.
  * Rebuilt when parsing directory. */
-static size_t scroll_index_list[SCROLL_INDEX_SIZE];
+static size_t   scroll_index_list[SCROLL_INDEX_SIZE];
 static unsigned scroll_index_size               = 0;
 static unsigned scroll_acceleration             = 0;
 static size_t menu_driver_selection_ptr         = 0;
@@ -190,7 +191,7 @@ void menu_display_toggle_set_reason(enum menu_toggle_reason reason)
   menu_display_toggle_reason = reason;
 }
 
-/* Check if the current menu driver is compatible 
+/* Check if the current menu driver is compatible
  * with your video driver. */
 static bool menu_display_check_compatibility(
       enum menu_display_driver_type type,
@@ -325,7 +326,9 @@ static font_data_t *menu_display_font_main_init(
    return font_data;
 }
 
-font_data_t *menu_display_font(enum application_special_type type, float font_size,
+font_data_t *menu_display_font(
+      enum application_special_type type,
+      float font_size,
       bool is_threaded)
 {
    menu_display_ctx_font_t font_info;
@@ -333,7 +336,8 @@ font_data_t *menu_display_font(enum application_special_type type, float font_si
 
    fontpath[0] = '\0';
 
-   fill_pathname_application_special(fontpath, sizeof(fontpath), type);
+   fill_pathname_application_special(
+         fontpath, sizeof(fontpath), type);
 
    font_info.path = fontpath;
    font_info.size = font_size;
@@ -341,7 +345,7 @@ font_data_t *menu_display_font(enum application_special_type type, float font_si
    return menu_display_font_main_init(&font_info, is_threaded);
 }
 
-/* Reset the menu's coordinate array vertices. 
+/* Reset the menu's coordinate array vertices.
  * NOTE: Not every menu driver uses this. */
 void menu_display_coords_array_reset(void)
 {
@@ -364,7 +368,7 @@ void menu_display_set_font_framebuffer(const uint8_t *buffer)
 }
 
 static bool menu_display_libretro_running(
-      bool rarch_is_inited, 
+      bool rarch_is_inited,
       bool rarch_is_dummy_core)
 {
    settings_t *settings = config_get_ptr();
@@ -377,11 +381,13 @@ static bool menu_display_libretro_running(
 }
 
 /* Display the libretro core's framebuffer onscreen. */
-bool menu_display_libretro(bool is_idle, bool rarch_is_inited, bool rarch_is_dummy_core)
+bool menu_display_libretro(bool is_idle,
+      bool rarch_is_inited, bool rarch_is_dummy_core)
 {
    video_driver_set_texture_enable(true, false);
 
-   if (menu_display_libretro_running(rarch_is_inited, rarch_is_dummy_core))
+   if (menu_display_libretro_running(
+            rarch_is_inited, rarch_is_dummy_core))
    {
       if (!input_driver_is_libretro_input_blocked())
          input_driver_set_libretro_input_blocked();
@@ -393,7 +399,8 @@ bool menu_display_libretro(bool is_idle, bool rarch_is_inited, bool rarch_is_dum
    }
 
    if (is_idle)
-      return true; /* Maybe return false here for indication of idleness? */
+      return true; /* Maybe return false here
+                      for indication of idleness? */
    return video_driver_cached_frame();
 }
 
@@ -458,8 +465,8 @@ void menu_display_set_font_data_init(bool state)
    menu_display_font_alloc_framebuf = state;
 }
 
-/* Returns true if an animation is still active or 
- * when the menu framebuffer still is dirty and 
+/* Returns true if an animation is still active or
+ * when the menu framebuffer still is dirty and
  * therefore it still needs to be rendered onscreen.
  *
  * This function can be used for optimization purposes
@@ -1049,8 +1056,8 @@ void menu_display_handle_savestate_thumbnail_upload(void *task_data,
    free(user_data);
 }
 
-/* Function that gets called when we want to load in a 
- * new menu wallpaper. 
+/* Function that gets called when we want to load in a
+ * new menu wallpaper.
  */
 void menu_display_handle_wallpaper_upload(void *task_data,
       void *user_data, const char *err)
@@ -1083,7 +1090,7 @@ void menu_display_allocate_white_texture(void)
          TEXTURE_FILTER_NEAREST, &menu_display_white_texture);
 }
 
-/* 
+/*
  * Draw a hardware cursor on top of the screen for the mouse.
  */
 void menu_display_draw_cursor(
@@ -1192,10 +1199,12 @@ void menu_display_snow(int width, int height)
 
       if (p->alive)
       {
-         int16_t mouse_x  = menu_input_mouse_state(MENU_MOUSE_X_AXIS);
+         int16_t mouse_x  = menu_input_mouse_state(
+               MENU_MOUSE_X_AXIS);
 
          p->y            += p->yspeed;
-         p->x            += menu_display_scalef(mouse_x, 0, width, -0.3, 0.3);
+         p->x            += menu_display_scalef(
+               mouse_x, 0, width, -0.3, 0.3);
          p->x            += p->xspeed;
 
          p->alive         = p->y >= 0 && p->y < height
@@ -1228,7 +1237,8 @@ void menu_display_snow(int width, int height)
       if (!p->alive)
          continue;
 
-      alpha = menu_display_randf(0, 100) > 90 ? p->alpha/2 : p->alpha;
+      alpha = menu_display_randf(0, 100) > 90 ?
+         p->alpha/2 : p->alpha;
 
       for (j = 0; j < 16; j++)
       {
@@ -1244,7 +1254,7 @@ void menu_display_snow(int width, int height)
    }
 }
 
-/* Draw text on top of the screen. 
+/* Draw text on top of the screen.
  */
 void menu_display_draw_text(
       const font_data_t *font, const char *text,
@@ -1255,8 +1265,9 @@ void menu_display_draw_text(
    struct font_params params;
 
    /* Don't draw outside of the screen */
-   if (x < -64 || x > width + 64
-         || y < -64 || y > height + 64)
+   if (     (x < -64 || x > width  + 64)
+         || (y < -64 || y > height + 64)
+      )
       return;
 
    params.x           = x / width;
@@ -1284,9 +1295,10 @@ void menu_display_reset_textures_list(
       uintptr_t *item, enum texture_filter_type filter_type)
 {
    struct texture_image ti;
-   char path[PATH_MAX_LENGTH];
+   char *texpath               = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+   size_t texpath_size         = PATH_MAX_LENGTH * sizeof(char);
 
-   path[0]                     = '\0';
+   texpath[0]                  = '\0';
 
    ti.width                    = 0;
    ti.height                   = 0;
@@ -1294,17 +1306,23 @@ void menu_display_reset_textures_list(
    ti.supports_rgba            = video_driver_supports_rgba();
 
    if (!string_is_empty(texture_path))
-      fill_pathname_join(path, iconpath, texture_path, sizeof(path));
+      fill_pathname_join(texpath, iconpath, texture_path, texpath_size);
 
-   if (string_is_empty(path) || !path_file_exists(path))
-      return;
+   if (string_is_empty(texpath) || !filestream_exists(texpath))
+      goto error;
 
-   if (!image_texture_load(&ti, path))
-      return;
+   if (!image_texture_load(&ti, texpath))
+      goto error;
 
    video_driver_texture_load(&ti,
          filter_type, item);
    image_texture_free(&ti);
+
+   free(texpath);
+   return;
+
+error:
+   free(texpath);
 }
 
 bool menu_driver_is_binding_state(void)
@@ -1478,7 +1496,7 @@ static void menu_driver_toggle(bool on)
    retro_keyboard_event_t *key_event          = NULL;
    retro_keyboard_event_t *frontend_key_event = NULL;
    settings_t                 *settings       = config_get_ptr();
-   bool pause_libretro                        = settings ? 
+   bool pause_libretro                        = settings ?
       settings->bools.menu_pause_libretro : false;
 
    menu_driver_toggled = on;
@@ -1564,17 +1582,17 @@ bool menu_driver_render(bool is_idle, bool rarch_is_inited,
       menu_display_framebuf_dirty = true;
 
    if (BIT64_GET(menu_driver_data->state, MENU_STATE_RENDER_MESSAGEBOX)
-         && !string_is_empty(menu_driver_data->menu_state.msg))
+         && !string_is_empty(menu_driver_data->menu_state_msg))
    {
       if (menu_driver_ctx->render_messagebox)
          menu_driver_ctx->render_messagebox(menu_userdata,
-               menu_driver_data->menu_state.msg);
+               menu_driver_data->menu_state_msg);
 
       if (ui_companion_is_on_foreground())
       {
          const ui_companion_driver_t *ui = ui_companion_get_ptr();
          if (ui->render_messagebox)
-            ui->render_messagebox(menu_driver_data->menu_state.msg);
+            ui->render_messagebox(menu_driver_data->menu_state_msg);
       }
    }
 
@@ -1604,13 +1622,13 @@ bool menu_driver_is_alive(void)
    return menu_driver_alive;
 }
 
-/* Checks if the menu framebuffer is set. 
+/* Checks if the menu framebuffer is set.
  * This would usually only return true
  * for framebuffer-based menu drivers, like RGUI. */
 bool menu_driver_is_texture_set(void)
 {
-   if (menu_driver_ctx)
-      return menu_driver_ctx->set_texture;
+   if (menu_driver_ctx && menu_driver_ctx->set_texture)
+      return true;
    return false;
 }
 
@@ -1698,24 +1716,20 @@ static bool menu_driver_init_internal(bool video_is_threaded)
       menu_driver_ctx->init(&menu_userdata, video_is_threaded);
 
    if (!menu_driver_data || !menu_init(menu_driver_data))
-   {
-      retroarch_fail(1, "init_menu()");
-      return false;
-   }
+      goto error;
 
    strlcpy(settings->arrays.menu_driver, menu_driver_ctx->ident,
          sizeof(settings->arrays.menu_driver));
 
    if (menu_driver_ctx->lists_init)
-   {
       if (!menu_driver_ctx->lists_init(menu_driver_data))
-      {
-         retroarch_fail(1, "init_menu()");
-         return false;
-      }
-   }
+         goto error;
 
    return true;
+
+error:
+   retroarch_fail(1, "init_menu()");
+   return false;
 }
 
 static bool menu_driver_context_reset(bool video_is_threaded)
@@ -2175,7 +2189,7 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
             if (pending_push)
                if (menu_driver_ctx->navigation_clear)
                   menu_driver_ctx->navigation_clear(
-                        menu_userdata, pending_push);
+                        menu_userdata, *pending_push);
          }
          break;
       case MENU_NAVIGATION_CTL_INCREMENT:
@@ -2206,7 +2220,7 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
                else if (menu_list_size > 0)
                   menu_driver_ctl(MENU_NAVIGATION_CTL_SET_LAST,  NULL);
             }
-            
+
             if (menu_driver_ctx->navigation_increment)
                menu_driver_ctx->navigation_increment(menu_userdata);
          }
@@ -2302,14 +2316,14 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
          break;
       case MENU_NAVIGATION_CTL_ADD_SCROLL_INDEX:
          {
-            size_t *sel      = (size_t*)data;
+            size_t *sel        = (size_t*)data;
             if (!sel)
                return false;
 
-            if ((scroll_index_size + 1) >= SCROLL_INDEX_SIZE)
-               scroll_index_list[scroll_index_size]   = *sel;
-            else
-               scroll_index_list[scroll_index_size++] = *sel;
+            scroll_index_list[scroll_index_size]   = *sel;
+
+            if (!((scroll_index_size + 1) >= SCROLL_INDEX_SIZE))
+               scroll_index_size++;
          }
          break;
       case MENU_NAVIGATION_CTL_GET_SCROLL_ACCEL:

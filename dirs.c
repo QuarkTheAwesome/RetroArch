@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2011-2017 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -19,6 +19,7 @@
 #include <lists/dir_list.h>
 #include <lists/string_list.h>
 #include <string/stdstring.h>
+#include <streams/file_stream.h>
 #include <retro_assert.h>
 
 #include "dirs.h"
@@ -56,7 +57,7 @@ bool dir_init_shader(void)
    struct rarch_dir_list *dir_list = (struct rarch_dir_list*)&dir_shader_list;
    settings_t           *settings  = config_get_ptr();
 
-   if (!*settings->paths.directory_video_shader)
+   if (!settings || !*settings->paths.directory_video_shader)
       return false;
 
    dir_list->list = dir_list_new_special(
@@ -82,7 +83,7 @@ bool dir_init_shader(void)
 
 bool dir_free_shader(void)
 {
-   struct rarch_dir_list *dir_list = 
+   struct rarch_dir_list *dir_list =
       (struct rarch_dir_list*)&dir_shader_list;
 
    dir_list_free(dir_list->list);
@@ -284,14 +285,19 @@ void dir_set(enum rarch_dir_type type, const char *path)
 
 static void check_defaults_dir_create_dir(const char *path)
 {
-   char new_path[PATH_MAX_LENGTH];
+   char *new_path = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
    new_path[0] = '\0';
    fill_pathname_expand_special(new_path,
-         path, sizeof(new_path));
+         path,
+         PATH_MAX_LENGTH * sizeof(char));
 
    if (path_is_directory(new_path))
+   {
+      free(new_path);
       return;
+   }
    path_mkdir(new_path);
+   free(new_path);
 }
 
 void dir_check_defaults(void)
@@ -300,7 +306,7 @@ void dir_check_defaults(void)
    /* early return for people with a custom folder setup
       so it doesn't create unnecessary directories
     */
-   if (path_file_exists("custom.ini"))
+   if (filestream_exists("custom.ini"))
       return;
 
    for (i = 0; i < DEFAULT_DIR_LAST; i++)

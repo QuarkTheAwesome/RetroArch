@@ -29,11 +29,17 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#ifdef _MSC_VER
+#include <compat/msvc.h>
+#endif
+
 #ifdef ANDROID
 #include <android/log.h>
 #endif
 
 #include <string/stdstring.h>
+#include <streams/file_stream.h>
+#include <compat/fopen_utf8.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -48,7 +54,8 @@
 
 /* If this is non-NULL. RARCH_LOG and friends
  * will write to this file. */
-static FILE *log_file            = NULL;
+static FILE *log_file_fp         = NULL;
+static void* log_file_buf        = NULL;
 static bool main_verbosity       = false;
 static bool log_file_initialized = false;
 
@@ -82,7 +89,7 @@ bool *verbosity_get_ptr(void)
 
 void *retro_main_log_file(void)
 {
-   return log_file;
+   return log_file_fp;
 }
 
 void retro_main_log_file_init(const char *path)
@@ -90,19 +97,25 @@ void retro_main_log_file_init(const char *path)
    if (log_file_initialized)
       return;
 
-   log_file             = stderr;
+   log_file_fp          = stderr;
    if (path == NULL)
       return;
 
-   log_file             = fopen(path, "wb");
+   log_file_fp          = fopen_utf8(path, "wb");
    log_file_initialized = true;
+
+   /* TODO: this is only useful for a few platforms, find which and add ifdef */
+   log_file_buf = calloc(1, 0x4000);
+   setvbuf(log_file_fp, (char*)log_file_buf, _IOFBF, 0x4000);
 }
 
 void retro_main_log_file_deinit(void)
 {
-   if (log_file && log_file != stderr)
-      fclose(log_file);
-   log_file = NULL;
+   if (log_file_fp && log_file_fp != stderr)
+      fclose(log_file_fp);
+   if (log_file_buf) free(log_file_buf);
+   log_file_fp = NULL;
+   log_file_buf = NULL;
 }
 
 #if !defined(HAVE_LOGGER)
@@ -137,6 +150,7 @@ static aslclient asl_client;
    asl_free(msg);
 #endif
 #elif defined(_XBOX1)
+   {
    /* FIXME: Using arbitrary string as fmt argument is unsafe. */
    char msg_new[1024];
    char buffer[1024];
@@ -148,6 +162,7 @@ static aslclient asl_client;
          fmt);
    wvsprintf(buffer, msg_new, ap);
    OutputDebugStringA(buffer);
+   }
 #elif defined(ANDROID)
    int prio = ANDROID_LOG_INFO;
    if (tag)

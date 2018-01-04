@@ -77,39 +77,68 @@ static void menu_display_wiiu_draw(void *data)
    if (wiiu->vertex_cache.current + 4 > wiiu->vertex_cache.size)
       return;
 
-   position_t* pos = wiiu->vertex_cache.positions + wiiu->vertex_cache.current;
-   tex_coord_t* coord = wiiu->vertex_cache.tex_coords + wiiu->vertex_cache.current;
+   tex_shader_vertex_t* v = wiiu->vertex_cache.v + wiiu->vertex_cache.current;
 
    float x0 = draw->x;
    float y0 = draw->y;
    float x1 = x0 + draw->width;
    float y1 = y0 + draw->height;
 
-   pos[0].x = (2.0f * x0 / wiiu->color_buffer.surface.width) - 1.0f;
-   pos[0].y = (2.0f * y0 / wiiu->color_buffer.surface.height) - 1.0f;
-   pos[1].x = (2.0f * x1 / wiiu->color_buffer.surface.width) - 1.0f;;
-   pos[1].y = (2.0f * y0 / wiiu->color_buffer.surface.height) - 1.0f;
-   pos[2].x = (2.0f * x1 / wiiu->color_buffer.surface.width) - 1.0f;;
-   pos[2].y = (2.0f * y1 / wiiu->color_buffer.surface.height) - 1.0f;
-   pos[3].x = (2.0f * x0 / wiiu->color_buffer.surface.width) - 1.0f;;
-   pos[3].y = (2.0f * y1 / wiiu->color_buffer.surface.height) - 1.0f;
+   if(draw->coords->vertex && draw->coords->vertices == 4)
+   {
+      for(int i = 0; i < 4; i++)
+      {
+         v[i].pos.x = draw->coords->vertex[i << 1] * 2.0f - 1.0f;
+         v[i].pos.y = draw->coords->vertex[(i << 1) + 1] * 2.0f - 1.0f;
+      }
+   }
+   else
+   {
+      v[0].pos.x = (2.0f * x0 / wiiu->color_buffer.surface.width) - 1.0f;
+      v[0].pos.y = (2.0f * y0 / wiiu->color_buffer.surface.height) - 1.0f;
+      v[1].pos.x = (2.0f * x1 / wiiu->color_buffer.surface.width) - 1.0f;;
+      v[1].pos.y = (2.0f * y0 / wiiu->color_buffer.surface.height) - 1.0f;
+      v[2].pos.x = (2.0f * x1 / wiiu->color_buffer.surface.width) - 1.0f;;
+      v[2].pos.y = (2.0f * y1 / wiiu->color_buffer.surface.height) - 1.0f;
+      v[3].pos.x = (2.0f * x0 / wiiu->color_buffer.surface.width) - 1.0f;;
+      v[3].pos.y = (2.0f * y1 / wiiu->color_buffer.surface.height) - 1.0f;
+   }
+   if(draw->coords->tex_coord && draw->coords->vertices == 4)
+   {
+      for(int i = 0; i < 4; i++)
+      {
+         v[i].coord.u = draw->coords->tex_coord[i << 1];
+         v[i].coord.v = draw->coords->tex_coord[(i << 1) + 1];
+      }
+   }
+   else
+   {
+      v[0].coord.u = 0.0f;
+      v[0].coord.v = 1.0f;
+      v[1].coord.u = 1.0f;
+      v[1].coord.v = 1.0f;
+      v[2].coord.u = 1.0f;
+      v[2].coord.v = 0.0f;
+      v[3].coord.u = 0.0f;
+      v[3].coord.v = 0.0f;
+   }
 
-   coord[0].u = 0.0f;
-   coord[0].v = 1.0f;
-   coord[1].u = 1.0f;
-   coord[1].v = 1.0f;
-   coord[2].u = 1.0f;
-   coord[2].v = 0.0f;
-   coord[3].u = 0.0f;
-   coord[3].v = 0.0f;
+
+   v[0].color = COLOR_RGBA(0xFF * draw->coords->color[0], 0xFF * draw->coords->color[1],
+                       0xFF * draw->coords->color[2], 0xFF * draw->coords->color[3]);
+   v[1].color = v[0].color;
+   v[2].color = v[0].color;
+   v[3].color = v[0].color;
+
+//   printf("color : %f, %f, %f, %f  --> 0x%08X\n", draw->coords->color[0], draw->coords->color[1], draw->coords->color[2], draw->coords->color[3], col[0]);
 
    GX2SetPixelTexture(texture, wiiu->shader->sampler.location);
 
-//   GX2SetBlendConstantColor(draw->coords->color[3], draw->coords->color[2], draw->coords->color[1], draw->coords->color[0]);
-//   GX2SetBlendControl(GX2_RENDER_TARGET_0, GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_INV_SRC_ALPHA, GX2_BLEND_COMBINE_MODE_ADD,
-//                      GX2_ENABLE,          GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_INV_SRC_ALPHA, GX2_BLEND_COMBINE_MODE_ADD);
 
-   GX2DrawEx(GX2_PRIMITIVE_MODE_QUADS, 4, wiiu->vertex_cache.current, 1);
+   if(draw->coords->vertex && draw->coords->vertices == 4)
+      GX2DrawEx(GX2_PRIMITIVE_MODE_TRIANGLE_STRIP, 4, wiiu->vertex_cache.current, 1);
+   else
+      GX2DrawEx(GX2_PRIMITIVE_MODE_QUADS, 4, wiiu->vertex_cache.current, 1);
 
 #if 0
    printf("(%i,%i,%i,%i) , (%i,%i)\n", (int)draw->x,

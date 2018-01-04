@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2011-2017 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -13,6 +13,14 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* Assume W-functions do not work below Win2K and Xbox platforms */
+#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0500 || defined(_XBOX)
+
+#ifndef LEGACY_WIN32
+#define LEGACY_WIN32
+#endif
+
+#endif
 
 #ifdef _WIN32
 #include <direct.h>
@@ -28,6 +36,10 @@
 #include <libgen.h>
 #endif
 
+#ifdef __HAIKU__
+#include <kernel/image.h>
+#endif
+
 #include <stdlib.h>
 #include <boolean.h>
 #include <string.h>
@@ -41,6 +53,7 @@
 #include <compat/posix_string.h>
 #include <retro_assert.h>
 #include <retro_miscellaneous.h>
+#include <encodings/utf.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -79,15 +92,18 @@ void fill_pathname_expand_special(char *out_path,
             )
    {
       size_t src_size;
-      char application_dir[PATH_MAX_LENGTH];
+      char *application_dir = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
-      application_dir[0] = '\0';
+      application_dir[0]    = '\0';
 
-      fill_pathname_application_path(application_dir, sizeof(application_dir));
+      fill_pathname_application_path(application_dir,
+            PATH_MAX_LENGTH * sizeof(char));
       path_basedir_wrapper(application_dir);
 
       src_size   = strlcpy(out_path, application_dir, size);
       retro_assert(src_size < size);
+
+      free(application_dir);
 
       out_path  += src_size;
       size      -= src_size;
@@ -106,8 +122,8 @@ void fill_pathname_abbreviate_special(char *out_path,
    unsigned i;
    const char *candidates[3];
    const char *notations[3];
-   char application_dir[PATH_MAX_LENGTH];
-   const char                      *home = getenv("HOME");
+   char *application_dir     = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+   const char *home          = getenv("HOME");
 
    application_dir[0] = '\0';
 
@@ -116,7 +132,8 @@ void fill_pathname_abbreviate_special(char *out_path,
     * Keep application dir in front of home, moving app dir to a
     * new location inside home would break otherwise. */
 
-   /* ugly hack - use application_dir pointer before filling it in. C89 reasons */
+   /* ugly hack - use application_dir pointer
+    * before filling it in. C89 reasons */
    candidates[0] = application_dir;
    candidates[1] = home;
    candidates[2] = NULL;
@@ -125,24 +142,27 @@ void fill_pathname_abbreviate_special(char *out_path,
    notations [1] = "~";
    notations [2] = NULL;
 
-   fill_pathname_application_path(application_dir, sizeof(application_dir));
+   fill_pathname_application_path(application_dir,
+         PATH_MAX_LENGTH * sizeof(char));
    path_basedir_wrapper(application_dir);
-   
+
    for (i = 0; candidates[i]; i++)
    {
-      if (!string_is_empty(candidates[i]) && strstr(in_path, candidates[i]) == in_path)
+      if (!string_is_empty(candidates[i]) &&
+            strstr(in_path, candidates[i]) == in_path)
       {
          size_t src_size  = strlcpy(out_path, notations[i], size);
 
          retro_assert(src_size < size);
-      
+
          out_path        += src_size;
          size            -= src_size;
          in_path         += strlen(candidates[i]);
-      
+
          if (!path_char_is_slash(*in_path))
          {
-            retro_assert(strlcpy(out_path, path_default_slash(), size) < size);
+            retro_assert(strlcpy(out_path,
+                     path_default_slash(), size) < size);
             out_path++;
             size--;
          }
@@ -150,6 +170,8 @@ void fill_pathname_abbreviate_special(char *out_path,
          break; /* Don't allow more abbrevs to take place. */
       }
    }
+
+   free(application_dir);
 #endif
 
    retro_assert(strlcpy(out_path, in_path, size) < size);
@@ -158,6 +180,7 @@ void fill_pathname_abbreviate_special(char *out_path,
 bool fill_pathname_application_data(char *s, size_t len)
 {
 #if defined(_WIN32) && !defined(_XBOX)
+#ifdef LEGACY_WIN32
    const char *appdata = getenv("APPDATA");
 
    if (appdata)
@@ -165,6 +188,21 @@ bool fill_pathname_application_data(char *s, size_t len)
       strlcpy(s, appdata, len);
       return true;
    }
+#else
+   const wchar_t *appdataW = _wgetenv(L"APPDATA");
+
+   if (appdataW)
+   {
+      char *appdata = utf16_to_utf8_string_alloc(appdataW);
+
+      if (appdata)
+      {
+         strlcpy(s, appdata, len);
+         free(appdata);
+         return true;
+      }
+   }
+#endif
 
 #elif defined(OSX)
    const char *appdata = getenv("HOME");
@@ -211,7 +249,7 @@ void fill_pathname_application_path(char *s, size_t len)
 #endif
 #ifdef _WIN32
    DWORD ret;
-   wchar_t ws[PATH_MAX_LENGTH] = {0};
+   wchar_t wstr[PATH_MAX_LENGTH] = {0};
 #endif
 #ifdef __HAIKU__
    image_info info;
@@ -223,7 +261,22 @@ void fill_pathname_application_path(char *s, size_t len)
       return;
 
 #ifdef _WIN32
-   ret    = GetModuleFileName(GetModuleHandle(NULL), s, len - 1);
+#ifdef LEGACY_WIN32
+   ret    = GetModuleFileNameA(GetModuleHandle(NULL), s, len);
+#else
+   ret    = GetModuleFileNameW(GetModuleHandle(NULL), wstr, ARRAY_SIZE(wstr));
+
+   if (*wstr)
+   {
+      char *str = utf16_to_utf8_string_alloc(wstr);
+
+      if (str)
+      {
+         strlcpy(s, str, len);
+         free(str);
+      }
+   }
+#endif
    s[ret] = '\0';
 #elif defined(__APPLE__)
    if (bundle)
@@ -233,7 +286,7 @@ void fill_pathname_application_path(char *s, size_t len)
       CFStringGetCString(bundle_path, s, len, kCFStringEncodingUTF8);
       CFRelease(bundle_path);
       CFRelease(bundle_url);
-      
+
       retro_assert(strlcat(s, "nobin", len) < len);
       return;
    }
@@ -260,7 +313,7 @@ void fill_pathname_application_path(char *s, size_t len)
       char link_path[255];
 
       link_path[0] = *s = '\0';
-      pid       = getpid(); 
+      pid       = getpid();
 
       /* Linux, BSD and Solaris paths. Not standardized. */
       for (i = 0; i < ARRAY_SIZE(exts); i++)
@@ -278,7 +331,7 @@ void fill_pathname_application_path(char *s, size_t len)
          }
       }
    }
-   
+
    RARCH_ERR("Cannot resolve application path! This should not happen.\n");
 #endif
 }
@@ -288,7 +341,8 @@ void fill_pathname_application_path(char *s, size_t len)
 const char* xmb_theme_ident(void);
 #endif
 
-void fill_pathname_application_special(char *s, size_t len, enum application_special_type type)
+void fill_pathname_application_special(char *s,
+      size_t len, enum application_special_type type)
 {
    switch (type)
    {
@@ -322,13 +376,16 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
       case APPLICATION_SPECIAL_DIRECTORY_ASSETS_ZARCH_FONT:
 #ifdef HAVE_ZARCH
          {
-            char s1[PATH_MAX_LENGTH];
-            s1[0] = '\0';
+            char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+            s1[0]    = '\0';
 
-            fill_pathname_application_special(s1, sizeof(s1),
+            fill_pathname_application_special(s1,
+                  PATH_MAX_LENGTH * sizeof(char),
                   APPLICATION_SPECIAL_DIRECTORY_ASSETS_ZARCH);
             fill_pathname_join(s,
                   s1, "Roboto-Condensed.ttf", len);
+
+            free(s1);
          }
 #endif
          break;
@@ -336,7 +393,7 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
 #ifdef HAVE_ZARCH
          {
             settings_t *settings     = config_get_ptr();
-            fill_pathname_join(s, 
+            fill_pathname_join(s,
                   settings->paths.directory_assets,
                   "zarch",
                   len);
@@ -346,17 +403,23 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
       case APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB_ICONS:
 #ifdef HAVE_XMB
          {
-            char s1[PATH_MAX_LENGTH];
-            char s2[PATH_MAX_LENGTH];
+            char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+            char *s2 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
             s1[0] = s2[0] = '\0';
 
-            fill_pathname_application_special(s1, sizeof(s1),
+            fill_pathname_application_special(s1,
+                  PATH_MAX_LENGTH * sizeof(char),
                   APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB);
             fill_pathname_join(s2, s1, "png",
-                  sizeof(s2));
-            fill_pathname_slash(s2, sizeof(s2));
+                  PATH_MAX_LENGTH * sizeof(char)
+                  );
+            fill_pathname_slash(s2,
+                  PATH_MAX_LENGTH * sizeof(char)
+                  );
             strlcpy(s, s2, len);
+            free(s1);
+            free(s2);
          }
 #endif
          break;
@@ -369,15 +432,17 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
                strlcpy(s, settings->paths.path_menu_wallpaper, len);
             else
             {
-               char s1[PATH_MAX_LENGTH];
+               char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
                s1[0] = '\0';
 
-               fill_pathname_application_special(s1, sizeof(s1),
+               fill_pathname_application_special(s1,
+                     PATH_MAX_LENGTH * sizeof(char),
                      APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB_ICONS);
                fill_pathname_join(s, s1,
                      file_path_str(FILE_PATH_BACKGROUND_IMAGE),
                      len);
+               free(s1);
             }
          }
 #endif
@@ -385,8 +450,8 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
       case APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB:
 #ifdef HAVE_XMB
          {
-            char s1[PATH_MAX_LENGTH];
-            char s2[PATH_MAX_LENGTH];
+            char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+            char *s2 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
             settings_t *settings     = config_get_ptr();
 
             s1[0] = s2[0] = '\0';
@@ -395,10 +460,15 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
                   s1,
                   settings->paths.directory_assets,
                   "xmb",
-                  sizeof(s1));
+                  PATH_MAX_LENGTH * sizeof(char)
+                  );
             fill_pathname_join(s2,
-                  s1, xmb_theme_ident(), sizeof(s2));
+                  s1, xmb_theme_ident(),
+                  PATH_MAX_LENGTH * sizeof(char)
+                  );
             strlcpy(s, s2, len);
+            free(s1);
+            free(s2);
          }
 #endif
          break;
@@ -418,27 +488,35 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
       case APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI_ICONS:
 #ifdef HAVE_MATERIALUI
          {
-            char s1[PATH_MAX_LENGTH];
+            char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
             s1[0] = '\0';
 
             fill_pathname_application_special(s1,
-                  sizeof(s1), APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI);
-            fill_pathname_slash(s1, sizeof(s1));
+                  PATH_MAX_LENGTH * sizeof(char),
+                  APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI);
+            fill_pathname_slash(s1,
+                  PATH_MAX_LENGTH * sizeof(char)
+                  );
             strlcpy(s, s1, len);
+
+            free(s1);
          }
 #endif
          break;
       case APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI_FONT:
 #ifdef HAVE_MATERIALUI
          {
-            char s1[PATH_MAX_LENGTH];
+            char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
             s1[0] = '\0';
 
-            fill_pathname_application_special(s1, sizeof(s1),
+            fill_pathname_application_special(s1,
+                  PATH_MAX_LENGTH * sizeof(char),
                   APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI);
             fill_pathname_join(s, s1, "font.ttf", len);
+
+            free(s1);
          }
 #endif
          break;
@@ -451,19 +529,47 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
                strlcpy(s, settings->paths.path_menu_xmb_font, len);
             else
             {
-               char s1[PATH_MAX_LENGTH];
+               char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
                s1[0] = '\0';
 
-               fill_pathname_application_special(s1, sizeof(s1),
+               fill_pathname_application_special(s1,
+                     PATH_MAX_LENGTH * sizeof(char),
                      APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB);
                fill_pathname_join(s, s1,
                      file_path_str(FILE_PATH_TTF_FONT),
                      len);
+
+               free(s1);
             }
          }
 #endif
          break;
+      case APPLICATION_SPECIAL_DIRECTORY_THUMBNAILS_CHEEVOS_BADGES:
+      {
+        char *s1 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+        char *s2 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+        settings_t *settings     = config_get_ptr();
+
+        s1[0] = s2[0] = '\0';
+
+        fill_pathname_join(s1,
+              settings->paths.directory_thumbnails,
+              "cheevos",
+              len);
+        fill_pathname_join(s2,
+              s1, "badges",
+              PATH_MAX_LENGTH * sizeof(char)
+              );
+        fill_pathname_slash(s2,
+              PATH_MAX_LENGTH * sizeof(char)
+              );
+        strlcpy(s, s2, len);
+        free(s1);
+        free(s2);
+      }
+      break;
+
       case APPLICATION_SPECIAL_NONE:
       default:
          break;
@@ -488,15 +594,16 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
 void fill_short_pathname_representation_wrapper(char* out_rep,
       const char *in_path, size_t size)
 {
-   char path_short[PATH_MAX_LENGTH];
+   char *path_short = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 #ifdef HAVE_COMPRESSION
-   char *last_slash                  = NULL;
+   char *last_slash = NULL;
 #endif
 
    path_short[0] = '\0';
 
    fill_pathname(path_short, path_basename(in_path), "",
-            sizeof(path_short));
+         PATH_MAX_LENGTH * sizeof(char)
+         );
 
 #ifdef HAVE_COMPRESSION
    last_slash  = find_last_slash(path_short);
@@ -511,11 +618,13 @@ void fill_short_pathname_representation_wrapper(char* out_rep,
        */
       retro_assert(strlen(last_slash) > 1);
       strlcpy(out_rep, last_slash + 1, size);
+      free(path_short);
       return;
    }
 #endif
 
    fill_short_pathname_representation(out_rep, in_path, size);
+   free(path_short);
 }
 
 /**

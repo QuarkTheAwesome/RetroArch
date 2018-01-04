@@ -63,12 +63,12 @@ char *string_replace_substring(const char *in,
    const char *inprev = NULL;
    char          *out = NULL;
    char        *outat = NULL;
-   
+
    /* if either pattern or replacement is NULL,
     * duplicate in and let caller handle it. */
    if (!pattern || !replacement)
       return strdup(in);
-   
+
    pattern_len     = strlen(pattern);
    replacement_len = strlen(replacement);
    numhits         = 0;
@@ -79,7 +79,7 @@ char *string_replace_substring(const char *in,
       inat += pattern_len;
       numhits++;
    }
-   
+
    outlen          = strlen(in) - pattern_len*numhits + replacement_len*numhits;
    out             = (char *)malloc(outlen+1);
    outat           = out;
@@ -96,7 +96,7 @@ char *string_replace_substring(const char *in,
       inprev = inat;
    }
    strcpy(outat, inprev);
-   
+
    return out;
 }
 
@@ -161,15 +161,15 @@ char *word_wrap(char* buffer, const char *string, int line_width, bool unicode)
          unsigned char_len;
          unsigned j = i;
 
-         character = utf8skip(&string[i], 1);
-         char_len = character - &string[i];
-
          /* check if end of string reached */
          if (i == len)
          {
             buffer[i] = 0;
             return buffer;
          }
+
+         character = utf8skip(&string[i], 1);
+         char_len = character - &string[i];
 
          if (!unicode)
             counter += char_len - 1;

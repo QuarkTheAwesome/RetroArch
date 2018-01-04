@@ -238,7 +238,7 @@ static void ctr_lcd_aptHook(APT_HookType hook, void* param)
                                CTRGU_ATTRIBFMT(GPU_SHORT, 4) << 0 |
                                CTRGU_ATTRIBFMT(GPU_SHORT, 4) << 4,
                                sizeof(ctr_vertex_t));
-      GPUCMD_Finalize();
+      GPU_Finalize();
       ctrGuFlushAndRun(true);
       gspWaitForEvent(GSPGPU_EVENT_P3D, false);
       ctr->p3d_event_pending = false;
@@ -407,7 +407,7 @@ static void* ctr_init(const video_info_t* video,
                             CTRGU_ATTRIBFMT(GPU_SHORT, 4) << 0 |
                             CTRGU_ATTRIBFMT(GPU_SHORT, 4) << 4,
                             sizeof(ctr_vertex_t));
-   GPUCMD_Finalize();
+   GPU_Finalize();
    ctrGuFlushAndRun(true);
 
    ctr->p3d_event_pending = true;
@@ -436,7 +436,7 @@ static void* ctr_init(const video_info_t* video,
    driver_ctl(RARCH_DRIVER_CTL_SET_REFRESH_RATE, &refresh_rate);
    aptHook(&ctr->lcd_aptHook, ctr_lcd_aptHook, ctr);
 
-   font_driver_init_osd(ctr, false, 
+   font_driver_init_osd(ctr, false,
          video->is_threaded,
          FONT_DRIVER_RENDER_CTR);
 
@@ -779,7 +779,7 @@ static bool ctr_frame(void* data, const void* frame,
 #endif
 
    GPU_FinishDrawing();
-   GPUCMD_Finalize();
+   GPU_Finalize();
    ctrGuFlushAndRun(true);
 
    ctrGuDisplayTransfer(true, ctr->drawbuffers.top.left,
@@ -826,7 +826,7 @@ static bool ctr_frame(void* data, const void* frame,
    topFramebufferInfo.unk       = 0x00000000;
 
    u8* framebufferInfoHeader    = gfxSharedMemory+0x200+gfxThreadID*0x80;
-	GSPGPU_FramebufferInfo* 
+	GSPGPU_FramebufferInfo*
       framebufferInfo           = (GSPGPU_FramebufferInfo*)&framebufferInfoHeader[0x4];
 	framebufferInfoHeader[0x0]  ^= 1;
 	framebufferInfo[framebufferInfoHeader[0x0]] = topFramebufferInfo;
@@ -1120,22 +1120,22 @@ static void ctr_set_osd_msg(void *data,
 }
 
 static const video_poke_interface_t ctr_poke_interface = {
+   NULL,                                  /* set_coords */
+   NULL,                                  /* set_mvp    */
    ctr_load_texture,
    ctr_unload_texture,
    NULL,
    ctr_set_filtering,
-   NULL, /* get_video_output_size */
-   NULL, /* get_video_output_prev */
-   NULL, /* get_video_output_next */
-   NULL, /* get_current_framebuffer */
+   NULL,                                  /* get_video_output_size */
+   NULL,                                  /* get_video_output_prev */
+   NULL,                                  /* get_video_output_next */
+   NULL,                                  /* get_current_framebuffer */
    NULL,
    ctr_set_aspect_ratio,
    ctr_apply_state_changes,
-#ifdef HAVE_MENU
    ctr_set_texture_frame,
    ctr_set_texture_enable,
    ctr_set_osd_msg,
-#endif
    NULL,
    NULL,
    NULL

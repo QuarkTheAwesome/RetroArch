@@ -173,26 +173,20 @@ static void content_load_init_wrap(
    *argc = 0;
    argv[(*argc)++] = strdup("retroarch");
 
-#ifdef HAVE_DYNAMIC
-   if (!args->no_content)
+   if (args->content_path)
    {
-#endif
-      if (args->content_path)
-      {
-         RARCH_LOG("Using content: %s.\n", args->content_path);
-         argv[(*argc)++] = strdup(args->content_path);
-      }
+      RARCH_LOG("Using content: %s.\n", args->content_path);
+      argv[(*argc)++] = strdup(args->content_path);
+   }
 #ifdef HAVE_MENU
-      else
-      {
-         RARCH_LOG("%s\n",
-               msg_hash_to_str(MSG_NO_CONTENT_STARTING_DUMMY_CORE));
-         argv[(*argc)++] = strdup("--menu");
-      }
-#endif
-#ifdef HAVE_DYNAMIC
+   else
+   {
+      RARCH_LOG("%s\n",
+            msg_hash_to_str(MSG_NO_CONTENT_STARTING_DUMMY_CORE));
+      argv[(*argc)++] = strdup("--menu");
    }
 #endif
+
 
    if (args->sram_path)
    {
@@ -372,9 +366,10 @@ static bool load_content_from_compressed_archive(
       char **error_string)
 {
    union string_list_elem_attr attributes;
-   char new_path[PATH_MAX_LENGTH];
-   char new_basedir[PATH_MAX_LENGTH];
    ssize_t new_path_len              = 0;
+   size_t path_size                  = PATH_MAX_LENGTH * sizeof(char);
+   char *new_basedir                 = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+   char *new_path                    = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
    bool ret                          = false;
 
    new_path[0]                       = '\0';
@@ -386,7 +381,7 @@ static bool load_content_from_compressed_archive(
 
    if (!string_is_empty(content_ctx->directory_cache))
       strlcpy(new_basedir, content_ctx->directory_cache,
-            sizeof(new_basedir));
+            path_size);
 
    if (string_is_empty(new_basedir) || !path_is_directory(new_basedir))
    {
@@ -395,35 +390,47 @@ static bool load_content_from_compressed_archive(
             "Setting cache directory to directory "
             "derived by basename...\n");
       fill_pathname_basedir(new_basedir, path,
-            sizeof(new_basedir));
+            path_size);
    }
 
    new_path[0]    = '\0';
    new_basedir[0] = '\0';
 
    fill_pathname_join(new_path, new_basedir,
-         path_basename(path), sizeof(new_path));
+         path_basename(path), path_size);
 
-   ret = file_archive_compressed_read(path, NULL, new_path, &new_path_len);
+   ret = file_archive_compressed_read(path,
+         NULL, new_path, &new_path_len);
 
    if (!ret || new_path_len < 0)
    {
-      char str[1024];
-      snprintf(str, sizeof(str), "%s \"%s\".\n",
+      char *str = (char*)malloc(1024 * sizeof(char));
+      snprintf(str,
+            1024 * sizeof(char),
+            "%s \"%s\".\n",
             msg_hash_to_str(MSG_COULD_NOT_READ_CONTENT_FILE),
             path);
       *error_string = strdup(str);
-      return false;
+      free(str);
+      goto error;
    }
 
    string_list_append(additional_path_allocs, new_path, attributes);
    info[i].path =
       additional_path_allocs->elems[additional_path_allocs->size -1 ].data;
 
-   if (!string_list_append(content_ctx->temporary_content, new_path, attributes))
-      return false;
+   if (!string_list_append(content_ctx->temporary_content,
+            new_path, attributes))
+      goto error;
 
+   free(new_basedir);
+   free(new_path);
    return true;
+
+error:
+   free(new_basedir);
+   free(new_path);
+   return false;
 }
 
 static bool content_file_init_extract(
@@ -435,16 +442,12 @@ static bool content_file_init_extract(
       )
 {
    unsigned i;
+   char *new_path = NULL;
 
    for (i = 0; i < content->size; i++)
    {
-      char temp_content[PATH_MAX_LENGTH];
-      char new_path[PATH_MAX_LENGTH];
       bool block_extract                 = content->elems[i].attr.i & 1;
       const char *path                   = content->elems[i].data;
-      const char *valid_ext              = special ?
-                                           special->roms[i].valid_extensions :
-                                           content_ctx->valid_extensions;
       bool contains_compressed           = path_contains_compressed_file(path);
 
       /* Block extract check. */
@@ -455,36 +458,59 @@ static bool content_file_init_extract(
       if (!contains_compressed && !path_is_compressed_file(path))
          continue;
 
-      temp_content[0] = new_path[0] = '\0';
-
-      strlcpy(temp_content, path, sizeof(temp_content));
-
-      if (!valid_ext || !file_archive_extract_file(
-               temp_content,
-               sizeof(temp_content),
-               valid_ext,
-               !string_is_empty(content_ctx->directory_cache) ?
-               content_ctx->directory_cache : NULL,
-               new_path,
-               sizeof(new_path)))
       {
-         char str[1024];
+         char *temp_content    = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+         const char *valid_ext = special ?
+            special->roms[i].valid_extensions :
+            content_ctx->valid_extensions;
 
-         snprintf(str, sizeof(str), "%s: %s.\n",
-               msg_hash_to_str(
-                  MSG_FAILED_TO_EXTRACT_CONTENT_FROM_COMPRESSED_FILE),
-               temp_content);
-         return false;
+         new_path        = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+
+         temp_content[0] = new_path[0] = '\0';
+
+         if (!string_is_empty(path))
+            strlcpy(temp_content, path,
+                  PATH_MAX_LENGTH * sizeof(char));
+
+         if (!valid_ext || !file_archive_extract_file(
+                  temp_content,
+                  PATH_MAX_LENGTH * sizeof(char),
+                  valid_ext,
+                  !string_is_empty(content_ctx->directory_cache) ?
+                  content_ctx->directory_cache : NULL,
+                  new_path,
+                  PATH_MAX_LENGTH * sizeof(char)
+                  ))
+         {
+            char *str = (char*)malloc(1024 * sizeof(char));
+
+            snprintf(str, 1024 * sizeof(char),
+                  "%s: %s.\n",
+                  msg_hash_to_str(
+                     MSG_FAILED_TO_EXTRACT_CONTENT_FROM_COMPRESSED_FILE),
+                  temp_content);
+            free(temp_content);
+            free(str);
+            goto error;
+         }
+
+         string_list_set(content, i, new_path);
+
+         free(temp_content);
+
+         if (!string_list_append(content_ctx->temporary_content,
+                  new_path, *attr))
+            goto error;
+
+         free(new_path);
       }
-
-      string_list_set(content, i, new_path);
-
-      if (!string_list_append(content_ctx->temporary_content,
-               new_path, *attr))
-         return false;
    }
 
    return true;
+
+error:
+   free(new_path);
+   return false;
 }
 #endif
 
@@ -508,9 +534,10 @@ static bool content_file_load(
 {
    unsigned i;
    retro_ctx_load_content_info_t load_info;
-   char msg[1024];
+   size_t msg_size = 1024 * sizeof(char);
+   char *msg       = (char*)malloc(1024 * sizeof(char));
 
-   msg[0] = '\0';
+   msg[0]          = '\0';
 
    for (i = 0; i < content->size; i++)
    {
@@ -523,10 +550,10 @@ static bool content_file_load(
       {
          strlcpy(msg,
                msg_hash_to_str(MSG_ERROR_LIBRETRO_CORE_REQUIRES_CONTENT),
-               sizeof(msg)
+               msg_size
                );
          *error_string = strdup(msg);
-         return false;
+         goto error;
       }
 
       info[i].path = NULL;
@@ -544,12 +571,13 @@ static bool content_file_load(
                   content_ctx,
                   i, path, (void**)&info[i].data, &len))
          {
-            snprintf(msg, sizeof(msg),
+            snprintf(msg,
+                  msg_size,
                   "%s \"%s\".\n",
                   msg_hash_to_str(MSG_COULD_NOT_READ_CONTENT_FILE),
                   path);
             *error_string = strdup(msg);
-            return false;
+            goto error;
          }
 
          info[i].size = len;
@@ -569,7 +597,7 @@ static bool content_file_load(
                   &info[i], i,
                   additional_path_allocs, need_fullpath, path,
                   error_string))
-            return false;
+            goto error;
 #endif
       }
    }
@@ -580,10 +608,11 @@ static bool content_file_load(
 
    if (!core_load_game(&load_info))
    {
-      snprintf(msg, sizeof(msg),
+      snprintf(msg,
+            msg_size,
             "%s.", msg_hash_to_str(MSG_FAILED_TO_LOAD_CONTENT));
       *error_string = strdup(msg);
-      return false;
+      goto error;
    }
 
 #ifdef HAVE_CHEEVOS
@@ -599,15 +628,22 @@ static bool content_file_load(
    }
 #endif
 
+   free(msg);
    return true;
+
+error:
+   free(msg);
+   return false;
 }
 
-static const struct retro_subsystem_info *content_file_init_subsystem(
+static const struct
+retro_subsystem_info *content_file_init_subsystem(
       content_information_ctx_t *content_ctx,
       char **error_string,
       bool *ret)
 {
-   char msg[1024];
+   size_t path_size                           = 1024 * sizeof(char);
+   char *msg                                  = (char*)malloc(1024 * sizeof(char));
    struct string_list *subsystem              = path_get_subsystem_list();
    const struct retro_subsystem_info *special = libretro_find_subsystem_info(
             content_ctx->subsystem.data, content_ctx->subsystem.size,
@@ -617,7 +653,7 @@ static const struct retro_subsystem_info *content_file_init_subsystem(
 
    if (!special)
    {
-      snprintf(msg, sizeof(msg),
+      snprintf(msg, path_size,
             "Failed to find subsystem \"%s\" in libretro implementation.\n",
             path_get(RARCH_PATH_SUBSYSTEM));
       *error_string = strdup(msg);
@@ -628,14 +664,15 @@ static const struct retro_subsystem_info *content_file_init_subsystem(
    {
       strlcpy(msg,
             msg_hash_to_str(MSG_ERROR_LIBRETRO_CORE_REQUIRES_SPECIAL_CONTENT),
-            sizeof(msg)
+            path_size
             );
       *error_string = strdup(msg);
       goto error;
    }
    else if (special->num_roms && (special->num_roms != subsystem->size))
    {
-      snprintf(msg, sizeof(msg),
+      snprintf(msg,
+            path_size,
             "Libretro core requires %u content files for "
             "subsystem \"%s\", but %u content files were provided.\n",
             special->num_roms, special->desc,
@@ -645,7 +682,8 @@ static const struct retro_subsystem_info *content_file_init_subsystem(
    }
    else if (!special->num_roms && subsystem && subsystem->size)
    {
-      snprintf(msg, sizeof(msg),
+      snprintf(msg,
+            path_size,
             "Libretro core takes no content for subsystem \"%s\", "
             "but %u content files were provided.\n",
             special->desc,
@@ -655,10 +693,12 @@ static const struct retro_subsystem_info *content_file_init_subsystem(
    }
 
    *ret = true;
+   free(msg);
    return special;
 
 error:
    *ret = false;
+   free(msg);
    return NULL;
 }
 
@@ -698,7 +738,7 @@ static bool content_file_init_set_attribs(
       attr.i              |= (!contentless)  << 2;
 
       if (path_is_empty(RARCH_PATH_CONTENT)
-            && contentless 
+            && contentless
             && content_ctx->set_supports_no_game_enable)
          string_list_append(content, "", attr);
       else
@@ -729,14 +769,14 @@ static bool content_file_init(
       char **error_string)
 {
    struct retro_game_info               *info = NULL;
-   bool ret                                   = 
-      path_is_empty(RARCH_PATH_SUBSYSTEM) 
+   bool ret                                   =
+      path_is_empty(RARCH_PATH_SUBSYSTEM)
       ? true : false;
-   const struct retro_subsystem_info *special = 
-      path_is_empty(RARCH_PATH_SUBSYSTEM) 
+   const struct retro_subsystem_info *special =
+      path_is_empty(RARCH_PATH_SUBSYSTEM)
       ? NULL : content_file_init_subsystem(content_ctx, error_string, &ret);
 
-   if (  !ret || 
+   if (  !ret ||
          !content_file_init_set_attribs(content, special, content_ctx, error_string))
       return false;
 
@@ -811,20 +851,23 @@ static bool task_load_content(content_ctx_info_t *content_info,
       bool launched_from_cli,
       char **error_string)
 {
-   char name[255];
-   char msg[255];
    bool contentless = false;
    bool is_inited   = false;
 
-   name[0] = msg[0] = '\0';
-
    if (!content_load(content_info))
    {
+      /* TODO/FIXME - Hardcoded sizes */
+      char *name = (char*)malloc(255 * sizeof(char));
+      char *msg  = (char*)malloc(255 * sizeof(char));
+
+      name[0] = msg[0] = '\0';
+
       if (launched_from_menu)
       {
          if (!path_is_empty(RARCH_PATH_CONTENT) && !string_is_empty(name))
          {
-            snprintf(msg, sizeof(msg), "%s %s.\n",
+            snprintf(msg,
+                  255 * sizeof(char), "%s %s.\n",
                   msg_hash_to_str(MSG_FAILED_TO_LOAD),
                   name);
             *error_string = strdup(msg);
@@ -832,6 +875,8 @@ static bool task_load_content(content_ctx_info_t *content_info,
       }
       if (string_is_empty(name))
          *error_string = strdup("This core requires a content file.\n");
+      free(name);
+      free(msg);
       return false;
    }
 
@@ -840,30 +885,41 @@ static bool task_load_content(content_ctx_info_t *content_info,
    /* Push entry to top of history playlist */
    if (is_inited || contentless)
    {
-      char tmp[PATH_MAX_LENGTH];
+      char *tmp                      = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
       struct retro_system_info *info = NULL;
       rarch_system_info_t *sys_info  = runloop_get_system_info();
+      const char *path_content       = path_get(RARCH_PATH_CONTENT);
 
       tmp[0] = '\0';
 
       if (sys_info)
          info = &sys_info->info;
 
-      strlcpy(tmp, path_get(RARCH_PATH_CONTENT), sizeof(tmp));
+      if (!string_is_empty(path_content))
+         strlcpy(tmp, path_content, PATH_MAX_LENGTH * sizeof(char));
 
       if (!launched_from_menu)
       {
          /* Path can be relative here.
           * Ensure we're pushing absolute path. */
          if (!string_is_empty(tmp))
-            path_resolve_realpath(tmp, sizeof(tmp));
+            path_resolve_realpath(tmp,
+                  PATH_MAX_LENGTH * sizeof(char));
       }
+
+#ifdef HAVE_MENU
+      /* Push quick menu onto menu stack */
+      if (launched_from_cli)
+         menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, NULL);
+#endif
 
       if (info && !string_is_empty(tmp))
       {
          const char *core_path      = NULL;
          const char *core_name      = NULL;
+         const char *label          = NULL;
          playlist_t *playlist_tmp   = g_defaults.content_history;
+         global_t *global           = global_get_ptr();
 
          switch (path_is_media_type(tmp))
          {
@@ -894,24 +950,25 @@ static bool task_load_content(content_ctx_info_t *content_info,
 
          if (launched_from_cli)
          {
-            settings_t *settings                       = config_get_ptr();
+            settings_t *settings             = config_get_ptr();
             content_ctx->history_list_enable = settings->bools.history_list_enable;
          }
 
+         if (global && !string_is_empty(global->name.label))
+            label = global->name.label;
+
          if (
-                  content_ctx->history_list_enable 
-               && playlist_tmp 
-               && playlist_push(
+               content_ctx->history_list_enable
+               && playlist_tmp)
+            command_playlist_push_write(
                   playlist_tmp,
                   tmp,
-                  NULL,
+                  label,
                   core_path,
-                  core_name,
-                  NULL,
-                  NULL)
-               )
-            playlist_write_file(playlist_tmp);
+                  core_name);
       }
+
+      free(tmp);
    }
 
    return true;
@@ -933,7 +990,7 @@ static bool command_event_cmd_exec(const char *data,
    content_info.environ_get = menu_content_environment_get;
 #endif
 
-   if (path_get(RARCH_PATH_CONTENT) != (void*)data)
+   if (path_get(RARCH_PATH_CONTENT) != data)
    {
       path_clear(RARCH_PATH_CONTENT);
       if (!string_is_empty(data))
@@ -942,7 +999,7 @@ static bool command_event_cmd_exec(const char *data,
 
 #if defined(HAVE_DYNAMIC)
    if (!task_load_content(&content_info, content_ctx,
-            false, launched_from_cli, error_string))
+            true, launched_from_cli, error_string))
       return false;
 #else
    frontend_driver_set_fork(FRONTEND_FORK_CORE_WITH_ARGS);
@@ -955,15 +1012,15 @@ static bool command_event_cmd_exec(const char *data,
 static bool firmware_update_status(
       content_information_ctx_t *content_ctx)
 {
-   char s[PATH_MAX_LENGTH];
    core_info_ctx_firmware_t firmware_info;
-
    core_info_t *core_info     = NULL;
+   size_t s_size              = PATH_MAX_LENGTH * sizeof(char);
+   char *s                    = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
    core_info_get_current_core(&core_info);
 
    if (!core_info)
-      return false;
+      goto error;
 
    firmware_info.path         = core_info->path;
 
@@ -971,25 +1028,32 @@ static bool firmware_update_status(
       firmware_info.directory.system = content_ctx->directory_system;
    else
    {
-      strlcpy(s, path_get(RARCH_PATH_CONTENT) ,sizeof(s));
+      strlcpy(s, path_get(RARCH_PATH_CONTENT), s_size);
       path_basedir_wrapper(s);
       firmware_info.directory.system = s;
    }
 
-   RARCH_LOG("Updating firmware status for: %s on %s\n", core_info->path, 
+   RARCH_LOG("Updating firmware status for: %s on %s\n",
+         core_info->path,
          firmware_info.directory.system);
    core_info_list_update_missing_firmware(&firmware_info);
 
    if(
-         content_ctx->bios_is_missing && 
+         content_ctx->bios_is_missing &&
          content_ctx->check_firmware_before_loading)
    {
-      runloop_msg_queue_push(msg_hash_to_str(MSG_FIRMWARE), 100, 500, true);
-      RARCH_LOG("Load content blocked. Reason:  %s\n", msg_hash_to_str(MSG_FIRMWARE));
+      runloop_msg_queue_push(
+            msg_hash_to_str(MSG_FIRMWARE),
+            100, 500, true);
+      RARCH_LOG("Load content blocked. Reason: %s\n",
+            msg_hash_to_str(MSG_FIRMWARE));
 
+      free(s);
       return true;
    }
 
+error:
+   free(s);
    return false;
 }
 
@@ -1011,7 +1075,6 @@ bool task_push_start_dummy_core(content_ctx_info_t *content_info)
    content_ctx.is_ups_pref                    = rarch_ctl(RARCH_CTL_IS_UPS_PREF, NULL);
    content_ctx.patch_is_blocked               = rarch_ctl(RARCH_CTL_IS_PATCH_BLOCKED, NULL);
    content_ctx.bios_is_missing                = rarch_ctl(RARCH_CTL_IS_MISSING_BIOS, NULL);
-   content_ctx.history_list_enable            = false;
    content_ctx.directory_system               = NULL;
    content_ctx.directory_cache                = NULL;
    content_ctx.name_ips                       = NULL;
@@ -1062,7 +1125,7 @@ bool task_push_start_dummy_core(content_ctx_info_t *content_info)
       if (error_string)
       {
          runloop_msg_queue_push(error_string, 2, 90, true);
-         RARCH_ERR(error_string);
+         RARCH_ERR("%s\n", error_string);
          free(error_string);
       }
 
@@ -1085,12 +1148,13 @@ bool task_push_start_dummy_core(content_ctx_info_t *content_info)
 bool task_push_load_content_from_playlist_from_menu(
       const char *core_path,
       const char *fullpath,
+      const char *label,
       content_ctx_info_t *content_info,
       retro_task_callback_t cb,
       void *user_data)
 {
    content_information_ctx_t content_ctx;
-  
+
    bool ret                                   = true;
    char *error_string                         = NULL;
    global_t *global                           = global_get_ptr();
@@ -1103,7 +1167,6 @@ bool task_push_load_content_from_playlist_from_menu(
    content_ctx.is_ups_pref                    = rarch_ctl(RARCH_CTL_IS_UPS_PREF, NULL);
    content_ctx.patch_is_blocked               = rarch_ctl(RARCH_CTL_IS_PATCH_BLOCKED, NULL);
    content_ctx.bios_is_missing                = rarch_ctl(RARCH_CTL_IS_MISSING_BIOS, NULL);
-   content_ctx.history_list_enable            = false;
    content_ctx.directory_system               = NULL;
    content_ctx.directory_cache                = NULL;
    content_ctx.name_ips                       = NULL;
@@ -1127,6 +1190,10 @@ bool task_push_load_content_from_playlist_from_menu(
          content_ctx.name_bps                 = strdup(global->name.bps);
       if (!string_is_empty(global->name.ups))
          content_ctx.name_ups                 = strdup(global->name.ups);
+      if (label)
+         strlcpy(global->name.label, label, sizeof(global->name.label));
+      else
+         global->name.label[0] = '\0';
    }
 
    if (!string_is_empty(settings->paths.directory_system))
@@ -1149,7 +1216,7 @@ bool task_push_load_content_from_playlist_from_menu(
       if (error_string)
       {
          runloop_msg_queue_push(error_string, 2, 90, true);
-         RARCH_ERR(error_string);
+         RARCH_ERR("%s\n", error_string);
          free(error_string);
       }
 
@@ -1186,7 +1253,7 @@ end:
 bool task_push_start_current_core(content_ctx_info_t *content_info)
 {
    content_information_ctx_t content_ctx;
-  
+
    bool ret                                   = true;
    char *error_string                         = NULL;
    global_t *global                           = global_get_ptr();
@@ -1201,7 +1268,6 @@ bool task_push_start_current_core(content_ctx_info_t *content_info)
    content_ctx.is_ups_pref                    = rarch_ctl(RARCH_CTL_IS_UPS_PREF, NULL);
    content_ctx.patch_is_blocked               = rarch_ctl(RARCH_CTL_IS_PATCH_BLOCKED, NULL);
    content_ctx.bios_is_missing                = rarch_ctl(RARCH_CTL_IS_MISSING_BIOS, NULL);
-   content_ctx.history_list_enable            = false;
    content_ctx.directory_system               = NULL;
    content_ctx.directory_cache                = NULL;
    content_ctx.name_ips                       = NULL;
@@ -1244,7 +1310,7 @@ bool task_push_start_current_core(content_ctx_info_t *content_info)
 
    /* Load content */
    if (firmware_update_status(&content_ctx))
-      return true;
+      goto end;
 
    if (!task_load_content(content_info, &content_ctx,
             true, false, &error_string))
@@ -1252,7 +1318,7 @@ bool task_push_start_current_core(content_ctx_info_t *content_info)
       if (error_string)
       {
          runloop_msg_queue_push(error_string, 2, 90, true);
-         RARCH_ERR(error_string);
+         RARCH_ERR("%s\n", error_string);
          free(error_string);
       }
 
@@ -1317,7 +1383,7 @@ bool task_push_load_content_with_new_core_from_menu(
       void *user_data)
 {
    content_information_ctx_t content_ctx;
-  
+
    bool ret                                   = true;
    char *error_string                         = NULL;
    global_t *global                           = global_get_ptr();
@@ -1329,7 +1395,6 @@ bool task_push_load_content_with_new_core_from_menu(
    content_ctx.is_ups_pref                    = rarch_ctl(RARCH_CTL_IS_UPS_PREF, NULL);
    content_ctx.patch_is_blocked               = rarch_ctl(RARCH_CTL_IS_PATCH_BLOCKED, NULL);
    content_ctx.bios_is_missing                = rarch_ctl(RARCH_CTL_IS_MISSING_BIOS, NULL);
-   content_ctx.history_list_enable            = false;
    content_ctx.directory_system               = NULL;
    content_ctx.directory_cache                = NULL;
    content_ctx.name_ips                       = NULL;
@@ -1373,7 +1438,7 @@ bool task_push_load_content_with_new_core_from_menu(
       content_info->environ_get = menu_content_environment_get;
 
    if (firmware_update_status(&content_ctx))
-      return true;
+      goto end;
 
    if (!task_load_content(content_info, &content_ctx,
             true, false, &error_string))
@@ -1381,7 +1446,7 @@ bool task_push_load_content_with_new_core_from_menu(
       if (error_string)
       {
          runloop_msg_queue_push(error_string, 2, 90, true);
-         RARCH_ERR(error_string);
+         RARCH_ERR("%s\n", error_string);
          free(error_string);
       }
 
@@ -1392,7 +1457,7 @@ bool task_push_load_content_with_new_core_from_menu(
    }
 
 #else
-   command_event_cmd_exec(path_get(RARCH_PATH_CONTENT), &content_ctx, 
+   command_event_cmd_exec(path_get(RARCH_PATH_CONTENT), &content_ctx,
          false, &error_string);
    command_event(CMD_EVENT_QUIT, NULL);
 #endif
@@ -1433,7 +1498,6 @@ static bool task_load_content_callback(content_ctx_info_t *content_info,
    content_ctx.is_ups_pref                    = rarch_ctl(RARCH_CTL_IS_UPS_PREF, NULL);
    content_ctx.patch_is_blocked               = rarch_ctl(RARCH_CTL_IS_PATCH_BLOCKED, NULL);
    content_ctx.bios_is_missing                = rarch_ctl(RARCH_CTL_IS_MISSING_BIOS, NULL);
-   content_ctx.history_list_enable            = false;
    content_ctx.directory_system               = NULL;
    content_ctx.directory_cache                = NULL;
    content_ctx.name_ips                       = NULL;
@@ -1468,10 +1532,11 @@ static bool task_load_content_callback(content_ctx_info_t *content_info,
 #endif
 
    if (firmware_update_status(&content_ctx))
-      return true;
+      goto end;
 
    ret = task_load_content(content_info, &content_ctx, true, loading_from_cli, &error_string);
 
+end:
    if (content_ctx.name_ips)
       free(content_ctx.name_ips);
    if (content_ctx.name_bps)
@@ -1486,7 +1551,7 @@ static bool task_load_content_callback(content_ctx_info_t *content_info,
       if (error_string)
       {
          runloop_msg_queue_push(error_string, 2, 90, true);
-         RARCH_ERR(error_string);
+         RARCH_ERR("%s\n", error_string);
          free(error_string);
       }
 
@@ -1516,8 +1581,8 @@ bool task_push_load_content_with_new_core_from_companion_ui(
    if (!task_load_content_callback(content_info, true, false))
       return false;
 
-   /* Push quick menu onto menu stack */
 #ifdef HAVE_MENU
+   /* Push quick menu onto menu stack */
    menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, NULL);
 #endif
 
@@ -1656,7 +1721,7 @@ void content_deinit(void)
 
          RARCH_LOG("%s: %s.\n",
                msg_hash_to_str(MSG_REMOVING_TEMPORARY_CONTENT_FILE), path);
-         if (remove(path) < 0)
+         if (!filestream_delete(path))
             RARCH_ERR("%s: %s.\n",
                   msg_hash_to_str(MSG_FAILED_TO_REMOVE_TEMPORARY_FILE),
                   path);
@@ -1714,7 +1779,7 @@ bool content_init(void)
       if (!string_is_empty(global->name.ups))
          content_ctx.name_ups                 = strdup(global->name.ups);
    }
-   
+
    if (sys_info)
    {
       content_ctx.history_list_enable         = settings->bools.history_list_enable;
@@ -1737,7 +1802,7 @@ bool content_init(void)
    _content_is_inited = true;
    content            = string_list_new();
 
-   if (     !temporary_content 
+   if (     !temporary_content
          || !content_file_init(&content_ctx, content, &error_string))
    {
       content_deinit();

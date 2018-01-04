@@ -2,7 +2,7 @@
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
  *  Copyright (C) 2016-2017 - Brad Parker
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -113,6 +113,53 @@ static enum gfx_ctx_api x_api                 = GFX_CTX_NONE;
 
 static gfx_ctx_x_data_t *current_context_data = NULL;
 
+const unsigned long retroarch_icon_data[] = {
+   16, 16,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0xffffffff, 0xffffffff, 0xffffffff,
+   0x00000000, 0x00000000, 0x00000000, 0xffffffff, 0xffffffff, 0xffffffff,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xffffffff,
+   0xffffffff, 0xffffffff, 0x000000ff, 0xffffffff, 0xffffffff, 0x00000000,
+   0xffffffff, 0xffffffff, 0x000000ff, 0xffffffff, 0xffffffff, 0xffffffff,
+   0x00000000, 0x00000000, 0x00000000, 0xffffffff, 0x000000ff, 0xffffffff,
+   0xffffffff, 0x000000ff, 0xffffffff, 0xffffffff, 0xffffffff, 0x000000ff,
+   0xffffffff, 0xffffffff, 0x000000ff, 0xffffffff, 0x00000000, 0x00000000,
+   0x00000000, 0xffffffff, 0x000000ff, 0xffffffff, 0x000000ff, 0x000000ff,
+   0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0xffffffff,
+   0x000000ff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0xffffffff,
+   0x000000ff, 0x000000ff, 0x000000ff, 0xffffffff, 0x000000ff, 0x000000ff,
+   0x000000ff, 0xffffffff, 0x000000ff, 0x000000ff, 0x000000ff, 0xffffffff,
+   0x00000000, 0x00000000, 0x00000000, 0xffffffff, 0x000000ff, 0x000000ff,
+   0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff,
+   0x000000ff, 0x000000ff, 0x000000ff, 0xffffffff, 0x00000000, 0x00000000,
+   0x00000000, 0xffffffff, 0xffffffff, 0x000000ff, 0x000000ff, 0x000000ff,
+   0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff,
+   0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0xffffffff, 0xffffffff, 0x000000ff, 0xffffffff, 0xffffffff, 0xffffffff,
+   0xffffffff, 0xffffffff, 0x000000ff, 0xffffffff, 0xffffffff, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xffffffff, 0x000000ff,
+   0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0xffffffff,
+   0xffffffff, 0x000000ff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0xffffffff, 0xffffffff, 0xffffffff, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0xffffffff, 0xffffffff,
+   0xffffffff, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+   0x00000000, 0x00000000, 0x00000000, 0x00000000
+};
+
 #ifdef HAVE_OPENGL
 static PFNGLXCREATECONTEXTATTRIBSARBPROC glx_create_context_attribs;
 
@@ -122,7 +169,7 @@ static int GLXExtensionSupported(Display *dpy, const char *extension)
    const char *client_extensions = glXGetClientString(dpy, GLX_EXTENSIONS);
    const char *pos               = strstr(extensionsString, extension);
 
-   if (  (pos != NULL) && 
+   if (  (pos != NULL) &&
          (pos == extensionsString || pos[-1] == ' ') &&
          (pos[strlen(extension)] == ' ' || pos[strlen(extension)] == '\0')
       )
@@ -131,7 +178,7 @@ static int GLXExtensionSupported(Display *dpy, const char *extension)
    pos = strstr(client_extensions, extension);
 
    if (
-         (pos != NULL) && 
+         (pos != NULL) &&
          (pos == extensionsString || pos[-1] == ' ') &&
          (pos[strlen(extension)] == ' ' || pos[strlen(extension)] == '\0')
       )
@@ -180,7 +227,7 @@ static void gfx_ctx_x_destroy_resources(gfx_ctx_x_data_t *x)
                   x->g_hw_ctx = NULL;
                }
             }
-            
+
             if (g_x11_win)
             {
                if (x->g_glx_win)
@@ -243,7 +290,7 @@ static void gfx_ctx_x_destroy(void *data)
    gfx_ctx_x_data_t *x = (gfx_ctx_x_data_t*)data;
    if (!x)
       return;
-   
+
    gfx_ctx_x_destroy_resources(x);
 
    switch (x_api)
@@ -401,6 +448,7 @@ static bool gfx_ctx_x_set_resize(void *data,
                return false;
             }
 
+            vulkan_acquire_next_image(&x->vk);
             x->vk.context.invalid_swapchain = true;
             x->vk.need_new_swapchain        = false;
          }
@@ -574,6 +622,11 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    XSetWindowAttributes swa  = {0};
    int (*old_handler)(Display*, XErrorEvent*) = NULL;
    gfx_ctx_x_data_t *x       = (gfx_ctx_x_data_t*)data;
+   Atom net_wm_icon = XInternAtom(g_x11_dpy, "_NET_WM_ICON", False);
+   Atom net_wm_opacity = XInternAtom(g_x11_dpy, "_NET_WM_WINDOW_OPACITY", False);
+   Atom cardinal = XInternAtom(g_x11_dpy, "CARDINAL", False);
+   settings_t *settings = config_get_ptr();
+   unsigned opacity = settings->uints.video_window_opacity * ((unsigned)-1 / 100.0);
 
    frontend_driver_install_signal_handler();
 
@@ -656,10 +709,15 @@ static bool gfx_ctx_x_set_video_mode(void *data,
 
    g_x11_win = XCreateWindow(g_x11_dpy, RootWindow(g_x11_dpy, vi->screen),
          x_off, y_off, width, height, 0,
-         vi->depth, InputOutput, vi->visual, 
-         CWBorderPixel | CWColormap | CWEventMask | 
+         vi->depth, InputOutput, vi->visual,
+         CWBorderPixel | CWColormap | CWEventMask |
          (true_full ? CWOverrideRedirect : 0), &swa);
    XSetWindowBackground(g_x11_dpy, g_x11_win, 0);
+
+   XChangeProperty(g_x11_dpy, g_x11_win, net_wm_icon, cardinal, 32, PropModeReplace, (const unsigned char*)retroarch_icon_data, sizeof(retroarch_icon_data) / sizeof(*retroarch_icon_data));
+
+   if (opacity < (unsigned)-1)
+      XChangeProperty(g_x11_dpy, g_x11_win, net_wm_opacity, cardinal, 32, PropModeReplace, (const unsigned char*)&opacity, 1);
 
    switch (x_api)
    {
@@ -688,13 +746,13 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    }
    else if (fullscreen)
    {
-      /* We attempted true fullscreen, but failed. 
+      /* We attempted true fullscreen, but failed.
        * Attempt using windowed fullscreen. */
 
       XMapRaised(g_x11_dpy, g_x11_win);
       RARCH_LOG("[GLX]: Using windowed fullscreen.\n");
 
-      /* We have to move the window to the screen we want 
+      /* We have to move the window to the screen we want
        * to go fullscreen on first.
        * x_off and y_off usually get ignored in XCreateWindow().
        */
@@ -704,7 +762,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    else
    {
       XMapWindow(g_x11_dpy, g_x11_win);
-      /* If we want to map the window on a different screen, 
+      /* If we want to map the window on a different screen,
        * we'll have to do it by force.
        * Otherwise, we should try to let the window manager sort it out.
        * x_off and y_off usually get ignored in XCreateWindow(). */
@@ -736,7 +794,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
                   if (x->g_core_es_core)
                   {
                      /* Technically, we don't have core/compat until 3.2.
-                      * Version 3.1 is either compat or not depending on 
+                      * Version 3.1 is either compat or not depending on
                       * GL_ARB_compatibility.
                       */
                      *aptr++ = GLX_CONTEXT_PROFILE_MASK_ARB;
@@ -812,7 +870,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
             /* Use XCB surface since it's the most supported WSI.
              * We can obtain the XCB connection directly from X11. */
             if (!vulkan_surface_create(&x->vk, VULKAN_WSI_XCB,
-                     g_x11_dpy, &g_x11_win, 
+                     g_x11_dpy, &g_x11_win,
                      width, height, x->g_interval))
                goto error;
          }
@@ -871,7 +929,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
 
    gfx_ctx_x_swap_interval(data, x->g_interval);
 
-   /* This can blow up on some drivers. 
+   /* This can blow up on some drivers.
     * It's not fatal, so override errors for this call. */
    old_handler = XSetErrorHandler(x_nul_handler);
    XSetInputFocus(g_x11_dpy, g_x11_win, RevertToNone, CurrentTime);
@@ -1137,4 +1195,3 @@ const gfx_ctx_driver_t gfx_ctx_x = {
 #endif
    gfx_ctx_x_make_current
 };
-

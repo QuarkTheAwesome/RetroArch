@@ -28,16 +28,35 @@ typedef struct __attribute__((aligned(GX2_VERTEX_BUFFER_ALIGNMENT)))
    GX2SamplerVar sampler;
    struct
    {
+      GX2AttribVar color;
       GX2AttribVar position;
       GX2AttribVar tex_coord;
    } attributes;
    struct
    {
+      GX2AttribStream color;
       GX2AttribStream position;
       GX2AttribStream tex_coord;
    } attribute_stream;
    GX2FetchShader fs;
 }tex_shader_t;
+
+typedef struct
+{
+   struct
+   {
+      float x;
+      float y;
+   }pos;
+
+   struct
+   {
+      float u;
+      float v;
+   }coord;
+
+   u32 color;
+}tex_shader_vertex_t;
 
 extern tex_shader_t tex_shader;
 

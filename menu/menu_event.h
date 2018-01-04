@@ -25,7 +25,7 @@
 
 RETRO_BEGIN_DECLS
 
-/* 
+/*
  * This function gets called in order to process all input events
  * for the current frame.
  *
@@ -44,11 +44,11 @@ RETRO_BEGIN_DECLS
  * entire button state either but do a separate event per button
  * state.
  */
-unsigned menu_event(uint64_t input, uint64_t trigger_state);
+unsigned menu_event(retro_bits_t* p_input, retro_bits_t* p_trigger_state);
 
 /* Set a specific keyboard key.
  *
- * 'down' sets the latch (true would 
+ * 'down' sets the latch (true would
  * mean the key is being pressed down, while 'false' would mean that
  * the key has been released).
  **/

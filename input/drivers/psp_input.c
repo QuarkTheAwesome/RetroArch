@@ -41,7 +41,6 @@
 
 #include "../../defines/psp_defines.h"
 
-#include "../input_config.h"
 #include "../input_driver.h"
 
 typedef struct psp_input
@@ -49,8 +48,6 @@ typedef struct psp_input
    bool blocked;
    const input_device_driver_t *joypad;
 } psp_input_t;
-
-uint64_t lifecycle_state;
 
 static void psp_input_poll(void *data)
 {
@@ -107,11 +104,6 @@ static void* psp_input_initialize(const char *joypad_driver)
    return psp;
 }
 
-static bool psp_input_meta_key_pressed(void *data, int key)
-{
-   return (BIT64_GET(lifecycle_state, key));
-}
-
 static uint64_t psp_input_get_capabilities(void *data)
 {
    (void)data;
@@ -164,7 +156,6 @@ input_driver_t input_psp = {
    psp_input_initialize,
    psp_input_poll,
    psp_input_state,
-   psp_input_meta_key_pressed,
    psp_input_free_input,
    NULL,
    NULL,

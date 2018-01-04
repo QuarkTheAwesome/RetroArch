@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -68,7 +68,7 @@ typedef struct gfx_ctx_wayland_data
    struct wl_seat *seat;
    struct wl_shm *shm;
    unsigned swap_interval;
-   bool core_hw_context_enable; 
+   bool core_hw_context_enable;
 
    unsigned buffer_scale;
 
@@ -293,7 +293,7 @@ static void pointer_handle_button(void *data,
          wl->input.mouse.middle = true;
    }
    else
-   { 
+   {
       if (button == BTN_LEFT)
          wl->input.mouse.left = false;
       else if (button == BTN_RIGHT)
@@ -480,22 +480,22 @@ static void registry_handle_global(void *data, struct wl_registry *reg,
 
    (void)version;
 
-   if (string_is_equal_fast(interface, "wl_compositor", 13))
+   if (string_is_equal(interface, "wl_compositor"))
       wl->compositor = (struct wl_compositor*)wl_registry_bind(reg,
             id, &wl_compositor_interface, 3);
-   else if (string_is_equal_fast(interface, "wl_output", 9))
+   else if (string_is_equal(interface, "wl_output"))
    {
       output = (struct wl_output*)wl_registry_bind(reg,
             id, &wl_output_interface, 2);
       wl_output_add_listener(output, &output_listener, wl);
       wl_display_roundtrip(wl->input.dpy);
    }
-   else if (string_is_equal_fast(interface, "wl_shell", 8))
+   else if (string_is_equal(interface, "wl_shell"))
       wl->shell = (struct wl_shell*)
          wl_registry_bind(reg, id, &wl_shell_interface, 1);
-   else if (string_is_equal_fast(interface, "wl_shm", 6))
+   else if (string_is_equal(interface, "wl_shm"))
       wl->shm = (struct wl_shm*)wl_registry_bind(reg, id, &wl_shm_interface, 1);
-   else if (string_is_equal_fast(interface, "wl_seat", 7))
+   else if (string_is_equal(interface, "wl_seat"))
    {
       wl->seat = (struct wl_seat*)wl_registry_bind(reg, id, &wl_seat_interface, 4);
       wl_seat_add_listener(wl->seat, &seat_listener, wl);
@@ -645,7 +645,7 @@ static void gfx_ctx_wl_check_window(void *data, bool *quit,
    {
       case GFX_CTX_VULKAN_API:
 #ifdef HAVE_VULKAN
-         /* Swapchains are recreated in set_resize as a 
+         /* Swapchains are recreated in set_resize as a
           * central place, so use that to trigger swapchain reinit. */
          *resize = wl->vk.need_new_swapchain;
 #endif
@@ -684,7 +684,10 @@ static bool gfx_ctx_wl_set_resize(void *data, unsigned width, unsigned height)
          wl->height = height;
 
          if (vulkan_create_swapchain(&wl->vk, width, height, wl->swap_interval))
+         {
             wl->vk.context.invalid_swapchain = true;
+            vulkan_acquire_next_image(&wl->vk);
+         }
          else
          {
             RARCH_ERR("[Wayland/Vulkan]: Failed to update swapchain.\n");
@@ -1130,7 +1133,7 @@ static bool gfx_ctx_wl_set_video_mode(void *data,
 
 #ifdef HAVE_VULKAN
          if (!vulkan_surface_create(&wl->vk, VULKAN_WSI_WAYLAND,
-                  wl->input.dpy, wl->surface, 
+                  wl->input.dpy, wl->surface,
                   wl->width, wl->height, wl->swap_interval))
             goto error;
 #endif

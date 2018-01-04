@@ -37,7 +37,7 @@
 
 #include "../../gfx/video_driver.h"
 
-#include "../../input/input_config.h"
+#include "../../input/input_driver.h"
 #include "../../input/input_remapping.h"
 
 #ifndef BIND_ACTION_START
@@ -48,13 +48,7 @@
 
 static int action_start_remap_file_load(unsigned type, const char *label)
 {
-   global_t *global = global_get_ptr();
-
-   if (!global)
-      return -1;
-
-   global->name.remapfile[0] = '\0';
-   input_remapping_set_defaults();
+   input_remapping_set_defaults(true);
    return 0;
 }
 
@@ -194,7 +188,7 @@ static int action_start_core_setting(unsigned type,
 {
    unsigned idx                = type - MENU_SETTINGS_CORE_OPTION_START;
    core_option_manager_t *coreopts = NULL;
-   
+
    if (rarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts))
       core_option_manager_set_default(coreopts, idx);
 
@@ -354,7 +348,7 @@ int menu_cbs_init_bind_start(menu_file_list_cbs_t *cbs,
       return -1;
 
    BIND_ACTION_START(cbs, action_start_lookup_setting);
-   
+
    if (menu_cbs_init_bind_start_compare_label(cbs) == 0)
       return 0;
 

@@ -529,6 +529,8 @@
 				HEADER_SEARCH_PATHS = (
 					../../,
 					"../../libretro-common/include",
+					../../deps/stb,
+					../../deps/libz,
 					../../deps,
 				);
 				INFOPLIST_FILE = "RetroArch_iOS9-Info.plist";
@@ -556,7 +558,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -574,7 +575,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DRARCH_INTERNAL",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
@@ -612,6 +612,8 @@
 				HEADER_SEARCH_PATHS = (
 					../../,
 					"../../libretro-common/include",
+					../../deps/stb,
+					../../deps/libz,
 					../../deps,
 				);
 				INFOPLIST_FILE = "RetroArch_iOS9-Info.plist";
@@ -640,7 +642,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -658,7 +659,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DRARCH_INTERNAL",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
@@ -693,7 +693,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -712,7 +711,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
 					"-DHAVE_7ZIP",
@@ -750,6 +748,8 @@
 				HEADER_SEARCH_PATHS = (
 					../../,
 					"../../libretro-common/include",
+					../../deps/stb,
+					../../deps/libz,
 					../../deps,
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/iOS/Info.plist";
@@ -778,7 +778,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -796,7 +795,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DRARCH_INTERNAL",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
@@ -830,6 +828,8 @@
 				HEADER_SEARCH_PATHS = (
 					../../,
 					"../../libretro-common/include",
+					../../deps/stb,
+					../../deps/libz,
 					../../deps,
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/iOS/Info.plist";
@@ -858,7 +858,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -876,7 +875,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DRARCH_INTERNAL",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
@@ -908,7 +906,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -927,7 +924,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
 					"-DHAVE_7ZIP",
@@ -992,7 +988,6 @@
 					"-DIOS",
 					"-DHAVE_DYNAMIC",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -1003,7 +998,6 @@
 					"-DRARCH_MOBILE",
 					"-std=gnu99",
 					"-DHAVE_COREAUDIO",
-					"-DHAVE_FBO",
 					"-DHAVE_OVERLAY",
 					"-DHAVE_ZLIB",
 					"-DHAVE_RPNG",
@@ -1012,7 +1006,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 				);
 				"OTHER_LDFLAGS[arch=*]" = "-Wl,-segalign,4000";
 				SDKROOT = iphoneos;
@@ -1064,7 +1057,6 @@
 					"-DIOS",
 					"-DHAVE_DYNAMIC",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -1075,7 +1067,6 @@
 					"-DRARCH_MOBILE",
 					"-std=gnu99",
 					"-DHAVE_COREAUDIO",
-					"-DHAVE_FBO",
 					"-DHAVE_OVERLAY",
 					"-DHAVE_ZLIB",
 					"-DHAVE_RPNG",
@@ -1084,7 +1075,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 				);
 				"OTHER_LDFLAGS[arch=*]" = "-Wl,-segalign,4000";
 				SDKROOT = iphoneos;
@@ -1111,6 +1101,8 @@
 				HEADER_SEARCH_PATHS = (
 					../../,
 					"../../libretro-common/include",
+					../../deps/stb,
+					../../deps/libz,
 					../../deps,
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/iOS/Info.plist";
@@ -1138,7 +1130,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -1156,7 +1147,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DRARCH_INTERNAL",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
@@ -1194,6 +1184,8 @@
 				HEADER_SEARCH_PATHS = (
 					../../,
 					"../../libretro-common/include",
+					../../deps/stb,
+					../../deps/libz,
 					../../deps,
 				);
 				INFOPLIST_FILE = "$(SRCROOT)/iOS/Info.plist";
@@ -1222,7 +1214,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -1240,7 +1231,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DRARCH_INTERNAL",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
@@ -1275,7 +1265,6 @@
 					"-DHAVE_LIBRETRODB",
 					"-DIOS",
 					"-DHAVE_OPENGL",
-					"-DHAVE_FBO",
 					"-DHAVE_OPENGLES",
 					"-DHAVE_OPENGLES2",
 					"-DHAVE_CC_RESAMPLER",
@@ -1294,7 +1283,6 @@
 					"-DHAVE_RTGA",
 					"-DHAVE_COCOATOUCH",
 					"-DHAVE_MAIN",
-					"-DSINC_LOWER_QUALITY",
 					"-DHAVE_THREADS",
 					"-DHAVE_FILTERS_BUILTIN",
 					"-DHAVE_7ZIP",

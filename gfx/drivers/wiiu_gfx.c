@@ -51,31 +51,28 @@ static const wiiu_render_mode_t wiiu_render_mode_map[] =
    {1920, 1080, GX2_TV_RENDER_MODE_WIDE_1080P}  /* GX2_TV_SCAN_MODE_1080P */
 };
 
-static int wiiu_set_position(position_t* position, GX2ColorBuffer* draw_buffer, float x0, float y0, float x1, float y1)
+static void wiiu_set_position(tex_shader_vertex_t* v, GX2ColorBuffer* draw_buffer, float x0, float y0, float x1, float y1)
 {
-   position[0].x = (2.0f * x0 / draw_buffer->surface.width) - 1.0f;
-   position[0].y = (2.0f * y0 / draw_buffer->surface.height) - 1.0f;
-   position[1].x = (2.0f * x1 / draw_buffer->surface.width) - 1.0f;;
-   position[1].y = (2.0f * y0 / draw_buffer->surface.height) - 1.0f;
-   position[2].x = (2.0f * x1 / draw_buffer->surface.width) - 1.0f;;
-   position[2].y = (2.0f * y1 / draw_buffer->surface.height) - 1.0f;
-   position[3].x = (2.0f * x0 / draw_buffer->surface.width) - 1.0f;;
-   position[3].y = (2.0f * y1 / draw_buffer->surface.height) - 1.0f;
-   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, position, 4 * sizeof(*position));
+   v[0].pos.x = (2.0f * x0 / draw_buffer->surface.width) - 1.0f;
+   v[0].pos.y = (2.0f * y0 / draw_buffer->surface.height) - 1.0f;
+   v[1].pos.x = (2.0f * x1 / draw_buffer->surface.width) - 1.0f;;
+   v[1].pos.y = (2.0f * y0 / draw_buffer->surface.height) - 1.0f;
+   v[2].pos.x = (2.0f * x1 / draw_buffer->surface.width) - 1.0f;;
+   v[2].pos.y = (2.0f * y1 / draw_buffer->surface.height) - 1.0f;
+   v[3].pos.x = (2.0f * x0 / draw_buffer->surface.width) - 1.0f;;
+   v[3].pos.y = (2.0f * y1 / draw_buffer->surface.height) - 1.0f;
 }
 
-static void wiiu_set_tex_coords(tex_coord_t* tex_coord, GX2Texture* texture, float u0, float v0, float u1, float v1, unsigned rotation)
+static void wiiu_set_tex_coords(tex_shader_vertex_t* v, GX2Texture* texture, float u0, float v0, float u1, float v1, unsigned rotation)
 {
-   tex_coord[((0 + rotation) % 4)].u = u0 / texture->surface.width;
-   tex_coord[((0 + rotation) % 4)].v = (v1 / texture->surface.height);
-   tex_coord[((1 + rotation) % 4)].u = u1 / texture->surface.width;
-   tex_coord[((1 + rotation) % 4)].v = (v1 / texture->surface.height);
-   tex_coord[((2 + rotation) % 4)].u = u1 / texture->surface.width;
-   tex_coord[((2 + rotation) % 4)].v = (v0 / texture->surface.height);
-   tex_coord[((3 + rotation) % 4)].u = u0 / texture->surface.width;
-   tex_coord[((3 + rotation) % 4)].v = (v0 / texture->surface.height);
-
-   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, tex_coord, 4 * sizeof(*tex_coord));
+   v[((0 + rotation) % 4)].coord.u = u0 / texture->surface.width;
+   v[((0 + rotation) % 4)].coord.v = (v1 / texture->surface.height);
+   v[((1 + rotation) % 4)].coord.u = u1 / texture->surface.width;
+   v[((1 + rotation) % 4)].coord.v = (v1 / texture->surface.height);
+   v[((2 + rotation) % 4)].coord.u = u1 / texture->surface.width;
+   v[((2 + rotation) % 4)].coord.v = (v0 / texture->surface.height);
+   v[((3 + rotation) % 4)].coord.u = u0 / texture->surface.width;
+   v[((3 + rotation) % 4)].coord.v = (v0 / texture->surface.height);
 }
 
 static void wiiu_gfx_update_viewport(wiiu_video_t* wiiu)
@@ -151,7 +148,7 @@ static void wiiu_gfx_update_viewport(wiiu_video_t* wiiu)
 
    float scale_w = wiiu->color_buffer.surface.width / wiiu->render_mode.width;
    float scale_h = wiiu->color_buffer.surface.height / wiiu->render_mode.height;
-   wiiu_set_position(wiiu->position, &wiiu->color_buffer,
+   wiiu_set_position(wiiu->v, &wiiu->color_buffer,
                      wiiu->vp.x * scale_w,
                      wiiu->vp.y * scale_h,
                     (wiiu->vp.x + wiiu->vp.width) * scale_w,
@@ -194,7 +191,6 @@ static void wiiu_gfx_set_aspect_ratio(void* data, unsigned aspect_ratio_idx)
 static void* wiiu_gfx_init(const video_info_t* video,
       const input_driver_t** input, void** input_data)
 {
-   int i;
    float refresh_rate = 60.0f / 1.001f;
    u32 size           = 0;
    u32 tmp            = 0;
@@ -215,7 +211,7 @@ static void* wiiu_gfx_init(const video_info_t* video,
       *input_data          = wiiuinput;
    }
 
-   /* video init */
+   /* video initialize */
    wiiu->cmd_buffer = MEM2_alloc(0x400000, 0x40);
    u32 init_attributes[] =
    {
@@ -276,19 +272,14 @@ static void* wiiu_gfx_init(const video_info_t* video,
    GX2SetScissor(0, 0, wiiu->color_buffer.surface.width, wiiu->color_buffer.surface.height);
    GX2SetDepthOnlyControl(GX2_DISABLE, GX2_DISABLE, GX2_COMPARE_FUNC_ALWAYS);
    GX2SetColorControl(GX2_LOGIC_OP_COPY, 1, GX2_DISABLE, GX2_ENABLE);
-#if 1
    GX2SetBlendControl(GX2_RENDER_TARGET_0, GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_INV_SRC_ALPHA, GX2_BLEND_COMBINE_MODE_ADD,
                       GX2_ENABLE,          GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_INV_SRC_ALPHA, GX2_BLEND_COMBINE_MODE_ADD);
-#else
-   GX2SetBlendControl(GX2_RENDER_TARGET_0, GX2_BLEND_MODE_ONE, GX2_BLEND_MODE_ZERO, GX2_BLEND_COMBINE_MODE_ADD,
-                      GX2_DISABLE,         GX2_BLEND_MODE_ONE, GX2_BLEND_MODE_ZERO, GX2_BLEND_COMBINE_MODE_ADD);
-#endif
    GX2SetCullOnlyControl(GX2_FRONT_FACE_CCW, GX2_DISABLE, GX2_DISABLE);
 #ifdef GX2_CAN_ACCESS_DATA_SECTION
    wiiu->shader = &tex_shader;
 #else
 
-   /* init shader */
+   /* Initialize shader */
    wiiu->shader = MEM2_alloc(sizeof(tex_shader), 0x1000);
    memcpy(wiiu->shader, &tex_shader, sizeof(tex_shader));
    GX2Invalidate(GX2_INVALIDATE_MODE_CPU, wiiu->shader, sizeof(tex_shader));
@@ -310,11 +301,11 @@ static void* wiiu_gfx_init(const video_info_t* video,
           wiiu->shader->ps.samplerVarCount * sizeof(GX2SamplerVar));
 
 #endif
-   wiiu->shader->fs.size = GX2CalcFetchShaderSizeEx(2, GX2_FETCH_SHADER_TESSELLATION_NONE,
-         GX2_TESSELLATION_MODE_DISCRETE);
+   wiiu->shader->fs.size = GX2CalcFetchShaderSizeEx(sizeof(wiiu->shader->attribute_stream) / sizeof(GX2AttribStream),
+                                                    GX2_FETCH_SHADER_TESSELLATION_NONE, GX2_TESSELLATION_MODE_DISCRETE);
    wiiu->shader->fs.program = MEM2_alloc(wiiu->shader->fs.size, GX2_SHADER_ALIGNMENT);
    GX2InitFetchShaderEx(&wiiu->shader->fs, (uint8_t*)wiiu->shader->fs.program,
-                        sizeof(wiiu->shader->attribute_stream) /  sizeof(GX2AttribStream),
+                        sizeof(wiiu->shader->attribute_stream) / sizeof(GX2AttribStream),
                         (GX2AttribStream*)&wiiu->shader->attribute_stream,
                         GX2_FETCH_SHADER_TESSELLATION_NONE, GX2_TESSELLATION_MODE_DISCRETE);
    GX2Invalidate(GX2_INVALIDATE_MODE_CPU_SHADER, wiiu->shader->fs.program, wiiu->shader->fs.size);
@@ -322,26 +313,34 @@ static void* wiiu_gfx_init(const video_info_t* video,
    GX2SetPixelShader(&wiiu->shader->ps);
    GX2SetFetchShader(&wiiu->shader->fs);
 
-   wiiu->position = MEM2_alloc(4 * sizeof(*wiiu->position), GX2_VERTEX_BUFFER_ALIGNMENT);
-   wiiu_set_position(wiiu->position, &wiiu->color_buffer, 0, 0,
+   wiiu->v = MEM2_alloc(4 * sizeof(*wiiu->v), GX2_VERTEX_BUFFER_ALIGNMENT);
+   wiiu_set_position(wiiu->v, &wiiu->color_buffer, 0, 0,
          wiiu->color_buffer.surface.width, wiiu->color_buffer.surface.height);
-
-   wiiu->tex_coord = MEM2_alloc(4 * sizeof(*wiiu->tex_coord), GX2_VERTEX_BUFFER_ALIGNMENT);
-   wiiu_set_tex_coords(wiiu->tex_coord, &wiiu->texture, 0, 0,
+   wiiu_set_tex_coords(wiiu->v, &wiiu->texture, 0, 0,
          wiiu->texture.surface.width, wiiu->texture.surface.height, wiiu->rotation);
 
-   GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->position), sizeof(*wiiu->position), wiiu->position);
-   GX2SetAttribBuffer(1, 4 * sizeof(*wiiu->tex_coord), sizeof(*wiiu->tex_coord), wiiu->tex_coord);
+   wiiu->v[0].color = 0xFFFFFFFF;
+   wiiu->v[1].color = 0xFFFFFFFF;
+   wiiu->v[2].color = 0xFFFFFFFF;
+   wiiu->v[3].color = 0xFFFFFFFF;
 
-   wiiu->menu.position = MEM2_alloc(4 * sizeof(*wiiu->menu.position), GX2_VERTEX_BUFFER_ALIGNMENT);
-   wiiu_set_position(wiiu->menu.position, &wiiu->color_buffer, 0, 0,
+   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, wiiu->v, 4 * sizeof(*wiiu->v));
+
+   GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->v), sizeof(*wiiu->v), wiiu->v);
+
+   wiiu->menu.v = MEM2_alloc(4 * sizeof(*wiiu->menu.v), GX2_VERTEX_BUFFER_ALIGNMENT);
+   wiiu_set_position(wiiu->menu.v, &wiiu->color_buffer, 0, 0,
          wiiu->color_buffer.surface.width, wiiu->color_buffer.surface.height);
-
-   wiiu->menu.tex_coord = MEM2_alloc(4 * sizeof(*wiiu->menu.tex_coord), GX2_VERTEX_BUFFER_ALIGNMENT);
-   wiiu_set_tex_coords(wiiu->menu.tex_coord, &wiiu->menu.texture, 0, 0,
+   wiiu_set_tex_coords(wiiu->menu.v, &wiiu->menu.texture, 0, 0,
          wiiu->menu.texture.surface.width, wiiu->menu.texture.surface.height, 0);
 
-   /* init frame texture */
+   wiiu->menu.v[0].color = 0xFFFFFF80;
+   wiiu->menu.v[1].color = 0xFFFFFF80;
+   wiiu->menu.v[2].color = 0xFFFFFF80;
+   wiiu->menu.v[3].color = 0xFFFFFF80;
+   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, wiiu->menu.v, 4 * sizeof(*wiiu->menu.v));
+
+   /* Initialize frame texture */
    memset(&wiiu->texture, 0, sizeof(GX2Texture));
    wiiu->texture.surface.width       = video->input_scale * RARCH_SCALE_BASE;
    wiiu->texture.surface.height      = video->input_scale * RARCH_SCALE_BASE;
@@ -390,12 +389,12 @@ static void* wiiu_gfx_init(const video_info_t* video,
    GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE, wiiu->menu.texture.surface.image,
                  wiiu->menu.texture.surface.imageSize);
 
-   wiiu->vertex_cache.size = 0x1000;
-   wiiu->vertex_cache.current = 0;
-   wiiu->vertex_cache.positions = MEM2_alloc(wiiu->vertex_cache.size * sizeof(position_t), GX2_VERTEX_BUFFER_ALIGNMENT);
-   wiiu->vertex_cache.tex_coords = MEM2_alloc(wiiu->vertex_cache.size * sizeof(tex_coord_t), GX2_VERTEX_BUFFER_ALIGNMENT);
+   wiiu->vertex_cache.size       = 0x1000;
+   wiiu->vertex_cache.current    = 0;
+   wiiu->vertex_cache.v  = MEM2_alloc(wiiu->vertex_cache.size
+         * sizeof(*wiiu->vertex_cache.v), GX2_VERTEX_BUFFER_ALIGNMENT);
 
-   /* init samplers */
+   /* Initialize samplers */
    GX2InitSampler(&wiiu->sampler_nearest, GX2_TEX_CLAMP_MODE_CLAMP, GX2_TEX_XY_FILTER_MODE_POINT);
    GX2InitSampler(&wiiu->sampler_linear, GX2_TEX_CLAMP_MODE_CLAMP, GX2_TEX_XY_FILTER_MODE_LINEAR);
 
@@ -415,10 +414,10 @@ static void* wiiu_gfx_init(const video_info_t* video,
    GX2SetTVEnable(GX2_ENABLE);
    GX2SetDRCEnable(GX2_ENABLE);
 
-   wiiu->keep_aspect   = true;
-   wiiu->should_resize = true;
-   wiiu->smooth        = video->smooth;
-   wiiu->vsync         = video->vsync;
+   wiiu->keep_aspect    = true;
+   wiiu->should_resize  = true;
+   wiiu->smooth         = video->smooth;
+   wiiu->vsync          = video->vsync;
    GX2SetSwapInterval(!!video->vsync);
 
    wiiu->vp.x           = 0;
@@ -438,12 +437,211 @@ static void* wiiu_gfx_init(const video_info_t* video,
    return wiiu;
 }
 
+#ifdef HAVE_OVERLAY
+static void gx2_overlay_tex_geom(void *data, unsigned image,
+      float x, float y, float w, float h)
+{
+   wiiu_video_t            *gx2 = (wiiu_video_t*)data;
+   struct gx2_overlay_data *o = NULL;
+
+   if (gx2)
+      o = (struct gx2_overlay_data*)&gx2->overlay[image];
+
+   if (!o)
+      return;
+
+   o->v[0].coord.u = x;
+   o->v[0].coord.v = y;
+   o->v[1].coord.u = x + w;
+   o->v[1].coord.v = y;
+   o->v[2].coord.u = x + w;
+   o->v[2].coord.v = y + h;
+   o->v[3].coord.u = x ;
+   o->v[3].coord.v = y + h;
+   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, o->v, sizeof(o->v));
+}
+
+static void gx2_overlay_vertex_geom(void *data, unsigned image,
+      float x, float y, float w, float h)
+{
+   wiiu_video_t            *gx2 = (wiiu_video_t*)data;
+   struct gx2_overlay_data *o = NULL;
+
+   /* Flipped, so we preserve top-down semantics. */
+   y = 1.0f - y;
+   h = -h;
+
+   /* expand from 0 - 1 to -1 - 1 */
+   x = (x * 2.0f) - 1.0f;
+   y = (y * 2.0f) - 1.0f;
+   w = (w * 2.0f);
+   h = (h * 2.0f);
+
+   if (gx2)
+      o = (struct gx2_overlay_data*)&gx2->overlay[image];
+
+   if (!o)
+      return;
+
+   o->v[0].pos.x = x;
+   o->v[0].pos.y = y;
+
+   o->v[1].pos.x = x + w;
+   o->v[1].pos.y = y;
+
+   o->v[2].pos.x = x + w;
+   o->v[2].pos.y = y + h;
+
+   o->v[3].pos.x = x ;
+   o->v[3].pos.y = y + h;
+
+   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, o->v,sizeof(o->v));
+}
+
+static void gx2_free_overlay(wiiu_video_t *gx2)
+{
+   unsigned i;
+   for (i = 0; i < gx2->overlays; i++)
+      MEM2_free(gx2->overlay[i].tex.surface.image);
+
+   free(gx2->overlay);
+   gx2->overlay = NULL;
+   gx2->overlays = 0;
+
+}
+
+static bool gx2_overlay_load(void *data,
+      const void *image_data, unsigned num_images)
+{
+   unsigned i,j;
+   wiiu_video_t *gx2 = (wiiu_video_t*)data;
+   const struct texture_image *images = (const struct texture_image*)image_data;
+
+   gx2_free_overlay(gx2);
+   gx2->overlay = (struct gx2_overlay_data*)calloc(num_images, sizeof(*gx2->overlay));
+   if (!gx2->overlay)
+      return false;
+
+   gx2->overlays = num_images;
+
+   for (i = 0; i < num_images; i++)
+   {
+      struct gx2_overlay_data *o = (struct gx2_overlay_data*)&gx2->overlay[i];
+
+      //GX2Texture* o->tex = calloc(1, sizeof(GX2Texture));
+
+      memset(&o->tex, 0, sizeof(GX2Texture));
+      o->tex.surface.width    = images[i].width;
+      o->tex.surface.height   = images[i].height;
+      o->tex.surface.depth    = 1;
+      o->tex.surface.dim      = GX2_SURFACE_DIM_TEXTURE_2D;
+      o->tex.surface.format   = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+      o->tex.surface.tileMode = GX2_TILE_MODE_LINEAR_ALIGNED;
+      o->tex.viewNumSlices    = 1;
+      o->tex.compMap          = GX2_COMP_SEL(_G, _B, _A, _R);
+      GX2CalcSurfaceSizeAndAlignment(&o->tex.surface);
+      GX2InitTextureRegs(&o->tex);
+
+      o->tex.surface.image = MEM2_alloc(o->tex.surface.imageSize,
+            o->tex.surface.alignment);
+
+      for (j = 0; (j< images[i].height) && (j < o->tex.surface.height); j++)
+         memcpy((uint32_t*)o->tex.surface.image + (j * o->tex.surface.pitch),
+               images[i].pixels + (j * images[i].width), images[i].width * sizeof(images[i].pixels));
+
+      GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE,  o->tex.surface.image,  o->tex.surface.imageSize);
+
+      /* Default. Stretch to whole screen. */
+      gx2_overlay_tex_geom(gx2, i, 0, 0, 1, 1); 
+      gx2_overlay_vertex_geom(gx2, i, 0, 0, 1, 1);
+      gx2->overlay[i].alpha_mod = 1.0f;
+      gx2->overlay[i].v[0].color = 0xFFFFFFFF;
+      gx2->overlay[i].v[1].color = 0xFFFFFFFF;
+      gx2->overlay[i].v[2].color = 0xFFFFFFFF;
+      gx2->overlay[i].v[3].color = 0xFFFFFFFF;
+
+
+      GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, o->v,sizeof(o->v));
+
+   }
+
+   return true;
+}
+
+static void gx2_overlay_enable(void *data, bool state)
+{
+
+   wiiu_video_t *gx2 = (wiiu_video_t*)data;
+   gx2->overlay_enable = state;
+}
+
+static void gx2_overlay_full_screen(void *data, bool enable)
+{
+   wiiu_video_t *gx2 = (wiiu_video_t*)data;
+   gx2->overlay_full_screen = enable;
+}
+
+static void gx2_overlay_set_alpha(void *data, unsigned image, float mod)
+{
+   wiiu_video_t *gx2 = (wiiu_video_t*)data;
+
+   if (gx2)
+   {
+      gx2->overlay[image].alpha_mod = mod;
+      gx2->overlay[image].v[0].color = COLOR_RGBA(0xFF, 0xFF, 0xFF, 0xFF * gx2->overlay[image].alpha_mod);
+      gx2->overlay[image].v[1].color = gx2->overlay[image].v[0].color;
+      gx2->overlay[image].v[2].color = gx2->overlay[image].v[0].color;
+      gx2->overlay[image].v[3].color = gx2->overlay[image].v[0].color;
+      GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, gx2->overlay[image].v, sizeof(gx2->overlay[image].v));
+   }
+}
+
+static void gx2_render_overlay(void *data)
+{
+   unsigned i;
+
+   wiiu_video_t *gx2 = (wiiu_video_t*)data;
+
+   for (i = 0; i < gx2->overlays; i++){
+
+      GX2SetAttribBuffer(0, sizeof(gx2->overlay[i].v), sizeof(*gx2->overlay[i].v), gx2->overlay[i].v);
+
+      GX2SetPixelTexture(&gx2->overlay[i].tex, gx2->shader->sampler.location);
+      GX2SetPixelSampler(&gx2->sampler_linear, gx2->shader->sampler.location);
+
+      GX2DrawEx(GX2_PRIMITIVE_MODE_QUADS, 4, 0, 1);
+
+   }
+
+}
+
+static const video_overlay_interface_t gx2_overlay_interface = {
+   gx2_overlay_enable,
+   gx2_overlay_load,
+   gx2_overlay_tex_geom,
+   gx2_overlay_vertex_geom,
+   gx2_overlay_full_screen,
+   gx2_overlay_set_alpha,
+};
+
+static void gx2_get_overlay_interface(void *data,
+      const video_overlay_interface_t **iface)
+{
+   (void)data;
+   *iface = &gx2_overlay_interface;
+}
+#endif
+
 static void wiiu_gfx_free(void* data)
 {
    wiiu_video_t* wiiu = (wiiu_video_t*) data;
 
    if (!wiiu)
       return;
+
+#ifdef HAVE_OVERLAY
+   gx2_free_overlay(wiiu);
+#endif
 
    /* clear leftover image */
    GX2ClearColor(&wiiu->color_buffer, 0.0f, 0.0f, 0.0f, 1.0f);
@@ -463,8 +661,7 @@ static void wiiu_gfx_free(void* data)
    MEM2_free(wiiu->cmd_buffer);
    MEM2_free(wiiu->texture.surface.image);
    MEM2_free(wiiu->menu.texture.surface.image);
-   MEM2_free(wiiu->vertex_cache.positions);
-   MEM2_free(wiiu->vertex_cache.tex_coords);
+   MEM2_free(wiiu->vertex_cache.v);
 
    MEM1_free(wiiu->color_buffer.surface.image);
 
@@ -482,11 +679,8 @@ static void wiiu_gfx_free(void* data)
 
    MEM2_free(wiiu->shader);
 #endif
-   MEM2_free(wiiu->position);
-   MEM2_free(wiiu->tex_coord);
-   MEM2_free(wiiu->menu.position);
-   MEM2_free(wiiu->menu.tex_coord);
-
+   MEM2_free(wiiu->v);
+   MEM2_free(wiiu->menu.v);
 
    free(wiiu);
 }
@@ -495,10 +689,16 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
       unsigned width, unsigned height, uint64_t frame_count,
       unsigned pitch, const char* msg, video_frame_info_t *video_info)
 {
-   (void)msg;
-   int i;
-
+#if 0
+   static float fps;
+   static u32 frames;
+   static u32 lastTick , currentTick;
+   u32 diff;
+#endif
+   uint32_t i;
    wiiu_video_t* wiiu = (wiiu_video_t*) data;
+
+   (void)msg;
 
    if(wiiu->vsync)
    {
@@ -517,32 +717,32 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
       else
          wiiu->last_vsync = last_vsync;
    }
-   GX2WaitForFlip();
 
+   GX2WaitForFlip();
 
    if (!width || !height)
       return true;
 
-   static u32 lastTick , currentTick;
+#if 0
    currentTick = OSGetSystemTick();
-   u32 diff = currentTick - lastTick;
-   static float fps;
-   static u32 frames;
+   diff        = currentTick - lastTick;
+
    frames++;
+
    if(diff > wiiu_timer_clock)
    {
       fps = (float)frames * ((float) wiiu_timer_clock / (float) diff);
       lastTick = currentTick;
       frames = 0;
    }
-#if 0
+
    static u32 last_frame_tick;
    if (!(wiiu->menu.enable))
       printf("frame time : %10.6f ms            \r", (float)(currentTick - last_frame_tick) * 1000.0f / (float)wiiu_timer_clock);
    last_frame_tick = currentTick;
-#endif
    printf("fps: %8.8f frames : %5i\r", fps, wiiu->frames++);
    fflush(stdout);
+#endif
 
    if (wiiu->should_resize)
       wiiu_gfx_update_viewport(wiiu);
@@ -559,8 +759,9 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
       if (height > wiiu->texture.surface.height)
          height = wiiu->texture.surface.height;
 
-      wiiu->width = width;
+      wiiu->width  = width;
       wiiu->height = height;
+
       if(wiiu->rgb32)
       {
          const uint32_t* src = frame;
@@ -568,7 +769,7 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
 
          for (i = 0; i < height; i++)
          {
-            int j;
+            uint32_t j;
             for(j = 0; j < width; j++)
                dst[j] = src[j];
             dst += wiiu->texture.surface.pitch;
@@ -577,12 +778,12 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
       }
       else
       {
-         const uint16_t* src = frame;
-         uint16_t* dst = (uint16_t*)wiiu->texture.surface.image;
+         const uint16_t *src = frame;
+         uint16_t       *dst = (uint16_t*)wiiu->texture.surface.image;
 
          for (i = 0; i < height; i++)
          {
-            int j;
+            unsigned j;
             for(j = 0; j < width; j++)
                dst[j] = __builtin_bswap16(src[j]);
             dst += wiiu->texture.surface.pitch;
@@ -593,11 +794,10 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
 
       GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE, wiiu->texture.surface.image,
                     wiiu->texture.surface.imageSize);
-      wiiu_set_tex_coords(wiiu->tex_coord, &wiiu->texture, 0, 0, width, height, wiiu->rotation);
+      wiiu_set_tex_coords(wiiu->v, &wiiu->texture, 0, 0, width, height, wiiu->rotation);
    }
 
-   GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->position), sizeof(*wiiu->position), wiiu->position);
-   GX2SetAttribBuffer(1, 4 * sizeof(*wiiu->tex_coord), sizeof(*wiiu->tex_coord), wiiu->tex_coord);
+   GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->v), sizeof(*wiiu->v), wiiu->v);
 
    GX2SetPixelTexture(&wiiu->texture, wiiu->shader->sampler.location);
    GX2SetPixelSampler(wiiu->smooth? &wiiu->sampler_linear : &wiiu->sampler_nearest,
@@ -605,10 +805,14 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
 
    GX2DrawEx(GX2_PRIMITIVE_MODE_QUADS, 4, 0, 1);
 
+#ifdef HAVE_OVERLAY
+   if (wiiu->overlay_enable)
+      gx2_render_overlay(wiiu);
+#endif
+
    if (wiiu->menu.enable)
    {
-      GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->menu.position), sizeof(*wiiu->menu.position), wiiu->menu.position);
-      GX2SetAttribBuffer(1, 4 * sizeof(*wiiu->menu.tex_coord), sizeof(*wiiu->menu.tex_coord), wiiu->menu.tex_coord);
+      GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->menu.v), sizeof(*wiiu->menu.v), wiiu->menu.v);
 
       GX2SetPixelTexture(&wiiu->menu.texture, wiiu->shader->sampler.location);
       GX2SetPixelSampler(&wiiu->sampler_linear, wiiu->shader->sampler.location);
@@ -617,8 +821,8 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
    }
 
    wiiu->vertex_cache.current = 0;
-   GX2SetAttribBuffer(0, wiiu->vertex_cache.size * sizeof(position_t), sizeof(position_t), wiiu->vertex_cache.positions);
-   GX2SetAttribBuffer(1, wiiu->vertex_cache.size * sizeof(tex_coord_t), sizeof(tex_coord_t), wiiu->vertex_cache.tex_coords);
+   GX2SetAttribBuffer(0, wiiu->vertex_cache.size * sizeof(*wiiu->vertex_cache.v),
+         sizeof(*wiiu->vertex_cache.v), wiiu->vertex_cache.v);
    GX2SetPixelSampler(&wiiu->sampler_linear, wiiu->shader->sampler.location);
 
    wiiu->render_msg_enabled = true;
@@ -631,8 +835,8 @@ static bool wiiu_gfx_frame(void* data, const void* frame,
 
    wiiu->render_msg_enabled = false;
 
-   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, wiiu->vertex_cache.positions, wiiu->vertex_cache.current * sizeof(position_t));
-   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, wiiu->vertex_cache.tex_coords, wiiu->vertex_cache.current * sizeof(tex_coord_t));
+   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER,
+         wiiu->vertex_cache.v, wiiu->vertex_cache.current * sizeof(*wiiu->vertex_cache.v));
 
    if (wiiu->menu.enable)
       GX2DrawDone();
@@ -713,7 +917,7 @@ static bool wiiu_gfx_read_viewport(void* data, uint8_t* buffer, bool is_idle)
 static uintptr_t wiiu_gfx_load_texture(void* video_data, void* data,
       bool threaded, enum texture_filter_type filter_type)
 {
-   int i;
+   uint32_t i;
    wiiu_video_t* wiiu = (wiiu_video_t*) video_data;
    struct texture_image *image = (struct texture_image*)data;
 
@@ -729,8 +933,8 @@ static uintptr_t wiiu_gfx_load_texture(void* video_data, void* data,
    texture->surface.tileMode    = GX2_TILE_MODE_LINEAR_ALIGNED;
    texture->viewNumSlices       = 1;
 
-   texture->surface.format   = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
-   texture->compMap          = GX2_COMP_SEL(_G, _B, _A, _R);
+   texture->surface.format      = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+   texture->compMap             = GX2_COMP_SEL(_G, _B, _A, _R);
 
    GX2CalcSurfaceSizeAndAlignment(&texture->surface);
    GX2InitTextureRegs(texture);
@@ -768,15 +972,15 @@ static void wiiu_gfx_apply_state_changes(void* data)
 
    if (wiiu)
       wiiu->should_resize = true;
-
-
 }
 
 static void wiiu_gfx_set_texture_frame(void* data, const void* frame, bool rgb32,
                                    unsigned width, unsigned height, float alpha)
 {
-   int i;
-   wiiu_video_t* wiiu = (wiiu_video_t*) data;
+   uint32_t i;
+   const uint16_t *src = NULL;
+   uint16_t *dst       = NULL;
+   wiiu_video_t* wiiu  = (wiiu_video_t*) data;
 
    if (!wiiu)
       return;
@@ -790,11 +994,11 @@ static void wiiu_gfx_set_texture_frame(void* data, const void* frame, bool rgb32
    if (height > wiiu->menu.texture.surface.height)
       height = wiiu->menu.texture.surface.height;
 
-   wiiu->menu.width = width;
+   wiiu->menu.width  = width;
    wiiu->menu.height = height;
 
-   const uint16_t* src = frame;
-   uint16_t* dst = (uint16_t*)wiiu->menu.texture.surface.image;
+   src               = frame;
+   dst               = (uint16_t*)wiiu->menu.texture.surface.image;
 
    for (i = 0; i < height; i++)
    {
@@ -806,8 +1010,7 @@ static void wiiu_gfx_set_texture_frame(void* data, const void* frame, bool rgb32
    GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE, wiiu->menu.texture.surface.image,
                  wiiu->menu.texture.surface.imageSize);
 
-   wiiu_set_tex_coords(wiiu->menu.tex_coord, &wiiu->menu.texture, 0, 0, width, height, 0);
-//   wiiu_set_tex_coords(wiiu->menu.tex_coord, &wiiu->menu.texture, 0, 0, wiiu->menu.texture.surface.width, wiiu->menu.texture.surface.height, 0);
+   wiiu_set_tex_coords(wiiu->menu.v, &wiiu->menu.texture, 0, 0, width, height, 0);
 }
 
 static void wiiu_gfx_set_texture_enable(void* data, bool state, bool full_screen)
@@ -838,29 +1041,31 @@ static void wiiu_gfx_set_osd_msg(void* data,
 
 static const video_poke_interface_t wiiu_poke_interface =
 {
+   NULL,                      /* set_coords */
+   NULL,                      /* set_mvp */
    wiiu_gfx_load_texture,
    wiiu_gfx_unload_texture,
-   NULL,
+   NULL, /* set_video_mode */
    wiiu_gfx_set_filtering,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */
    NULL, /* get_current_framebuffer */
-   NULL,
+   NULL, /* get_proc_address */
    wiiu_gfx_set_aspect_ratio,
    wiiu_gfx_apply_state_changes,
-#ifdef HAVE_MENU
    wiiu_gfx_set_texture_frame,
-#endif
    wiiu_gfx_set_texture_enable,
    wiiu_gfx_set_osd_msg,
-   NULL,
-   NULL,
-   NULL
+   NULL, /* show_mouse */
+   NULL, /* grab_mouse_toggle */
+   NULL, /* get_current_shader */
+   NULL, /* get_current_software_framebuffer */
+   NULL, /* get_hw_render_interface */
 };
 
 static void wiiu_gfx_get_poke_interface(void* data,
-                                        const video_poke_interface_t** iface)
+      const video_poke_interface_t** iface)
 {
    (void)data;
    *iface = &wiiu_poke_interface;
@@ -884,7 +1089,8 @@ video_driver_t video_wiiu =
    wiiu_gfx_read_viewport,
    NULL, /* read_frame_raw */
 #ifdef HAVE_OVERLAY
-   NULL, /* overlay_interface */
+   gx2_get_overlay_interface, /* overlay_interface */
 #endif
    wiiu_gfx_get_poke_interface,
+   NULL, /* wrap_type_to_enum */
 };

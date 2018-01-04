@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -34,7 +34,7 @@ static const font_renderer_driver_t *font_backends[] = {
    &coretext_font_renderer,
 #endif
 #ifdef HAVE_STB_FONT
-#if defined(VITA) || defined(WIIU) || defined(ANDROID) || defined(_WIN32) && !defined(_XBOX) && !defined(_MSC_VER) || defined(_WIN32) && !defined(_XBOX) && defined(_MSC_VER) && _MSC_VER > 1400
+#if defined(VITA) || defined(WIIU) || defined(ANDROID) || defined(_WIN32) && !defined(_XBOX) && !defined(_MSC_VER) || (defined(_WIN32) && !defined(_XBOX) && defined(_MSC_VER) && _MSC_VER > 1400) || defined(__CELLOS_LV2__)
    &stb_unicode_font_renderer,
 #else
    &stb_font_renderer,
@@ -51,7 +51,7 @@ int font_renderer_create_default(const void **data, void **handle,
 {
 
    unsigned i;
-   const font_renderer_driver_t **drv = 
+   const font_renderer_driver_t **drv =
       (const font_renderer_driver_t**)data;
 
    for (i = 0; font_backends[i]; i++)
@@ -88,9 +88,10 @@ static const font_renderer_t *d3d_font_backends[] = {
    &d3d_xdk1_font,
 #elif defined(_XBOX360)
    &d3d_xbox360_font,
-#elif defined(_WIN32)
+#elif defined(_WIN32) && defined(HAVE_D3D9)
    &d3d_win32_font,
 #endif
+   NULL
 };
 
 static bool d3d_font_init_first(
@@ -451,12 +452,14 @@ void font_driver_bind_block(void *font_data, void *block)
       font->renderer->bind_block(font->renderer_data, block);
 }
 
-void font_driver_flush(unsigned width, unsigned height, void *font_data)
+void font_driver_flush(unsigned width, unsigned height, void *font_data,
+      video_frame_info_t *video_info)
 {
    font_data_t *font = (font_data_t*)(font_data ? font_data : video_font_driver);
    if (font && font->renderer && font->renderer->flush)
-      font->renderer->flush(width, height, font->renderer_data);
+      font->renderer->flush(width, height, font->renderer_data, video_info);
 }
+
 
 int font_driver_get_message_width(void *font_data,
       const char *msg, unsigned len, float scale)
@@ -499,8 +502,8 @@ font_data_t *font_driver_init_first(
    bool ok                 = false;
 #ifdef HAVE_THREADS
 
-   if (     threading_hint 
-         && is_threaded 
+   if (     threading_hint
+         && is_threaded
          && !video_driver_is_hw_context())
       ok = video_thread_font_init(&font_driver, &font_handle,
             video_data, font_path, font_size, api, font_init_first,
@@ -525,7 +528,7 @@ font_data_t *font_driver_init_first(
 
 void font_driver_init_osd(
       void *video_data,
-      bool threading_hint, 
+      bool threading_hint,
       bool is_threaded,
       enum font_driver_render_api api)
 {

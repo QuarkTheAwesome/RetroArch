@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -22,10 +22,17 @@
 #ifndef _XBOX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#if _WIN32_WINNT <= 0x0400
+/* Windows versions below 98 do not support multiple monitors, so fake it */
+#define COMPILE_MULTIMON_STUBS
+#include <multimon.h>
+#endif
+
 #endif
 
 #include <boolean.h>
 #include <retro_common_api.h>
+#include <retro_environment.h>
 #include "../../driver.h"
 #include "../video_driver.h"
 
@@ -36,9 +43,7 @@
 #include "../../ui/drivers/ui_win32.h"
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
 
 #ifndef _XBOX
 extern unsigned g_resize_width;
@@ -118,7 +123,11 @@ void win32_window_reset(void);
 
 void win32_destroy_window(void);
 
-#ifdef HAVE_D3D9
+bool win32_taskbar_is_created(void);
+
+void win32_set_taskbar_created(bool created);
+
+#if defined(HAVE_D3D9) || defined(HAVE_D3D8)
 LRESULT CALLBACK WndProcD3D(HWND hwnd, UINT message,
       WPARAM wparam, LPARAM lparam);
 #endif
@@ -135,8 +144,8 @@ LRESULT CALLBACK WndProcGDI(HWND hwnd, UINT message,
 BOOL IsIconic(HWND hwnd);
 #endif
 
-#ifdef __cplusplus
-}
-#endif
+LRESULT win32_menu_loop(HWND owner, WPARAM wparam);
+
+RETRO_END_DECLS
 
 #endif

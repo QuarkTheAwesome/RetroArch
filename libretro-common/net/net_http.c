@@ -60,11 +60,11 @@ struct http_socket_state_t
 struct http_t
 {
    int status;
-   
+
    char part;
    char bodytype;
    bool error;
-   
+
    size_t pos;
    size_t len;
    size_t buflen;
@@ -117,8 +117,8 @@ void net_http_urlencode_full(char **dest, const char *source)
    for (; *source; source++)
    {
       /* any non-ascii character will just be encoded without question */
-      if ((int)*source < sizeof(urlencode_lut) && urlencode_lut[(int)*source])
-         snprintf(enc, len, "%c", urlencode_lut[(int)*source]);
+      if ((unsigned)*source < sizeof(urlencode_lut) && urlencode_lut[(unsigned)*source])
+         snprintf(enc, len, "%c", urlencode_lut[(unsigned)*source]);
       else
          snprintf(enc, len, "%%%02X", *source & 0xFF);
 
@@ -533,7 +533,7 @@ bool net_http_update(struct http_t *state, size_t* progress, size_t* total)
                      strlen("Content-Length: ")))
             {
                state->bodytype = T_LEN;
-               state->len = strtol(state->data + 
+               state->len = strtol(state->data +
                      strlen("Content-Length: "), NULL, 10);
             }
             if (string_is_equal(state->data, "Transfer-Encoding: chunked"))

@@ -2,7 +2,7 @@
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
  *  Copyright (C) 2014-2015 - Higor Euripedes
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -24,7 +24,6 @@
 
 #include "SDL.h"
 
-#include "../input_config.h"
 #include "../input_driver.h"
 #include "../input_keymaps.h"
 
@@ -39,7 +38,7 @@ typedef struct sdl_input
 
    int mouse_x, mouse_y;
    int mouse_abs_x, mouse_abs_y;
-   int mouse_l, mouse_r, mouse_m, mouse_wu, mouse_wd, mouse_wl, mouse_wr;
+   int mouse_l, mouse_r, mouse_m, mouse_b4, mouse_b5, mouse_wu, mouse_wd, mouse_wl, mouse_wr;
 } sdl_input_t;
 
 static void *sdl_input_init(const char *joypad_driver)
@@ -90,14 +89,9 @@ static int16_t sdl_analog_pressed(sdl_input_t *sdl, const struct retro_keybind *
    return pressed_plus + pressed_minus;
 }
 
-static bool sdl_input_meta_key_pressed(void *data, int key)
-{
-   return false;
-}
-
 static int16_t sdl_joypad_device_state(sdl_input_t *sdl,
       rarch_joypad_info_t joypad_info,
-      const struct retro_keybind *binds, 
+      const struct retro_keybind *binds,
       unsigned port, unsigned id, enum input_device_type *device)
 {
    if ((binds[id].key < RETROK_LAST) && sdl_key_pressed(binds[id].key))
@@ -132,6 +126,10 @@ static int16_t sdl_mouse_device_state(sdl_input_t *sdl, unsigned id)
          return sdl->mouse_y;
       case RETRO_DEVICE_ID_MOUSE_MIDDLE:
          return sdl->mouse_m;
+      case RETRO_DEVICE_ID_MOUSE_BUTTON_4:
+         return sdl->mouse_b4;
+      case RETRO_DEVICE_ID_MOUSE_BUTTON_5:
+         return sdl->mouse_b5;
    }
 
    return 0;
@@ -197,9 +195,9 @@ static int16_t sdl_lightgun_device_state(sdl_input_t *sdl, unsigned id)
       case RETRO_DEVICE_ID_LIGHTGUN_TURBO:
          return sdl->mouse_r;
       case RETRO_DEVICE_ID_LIGHTGUN_START:
-         return sdl->mouse_m && sdl->mouse_r; 
+         return sdl->mouse_m && sdl->mouse_r;
       case RETRO_DEVICE_ID_LIGHTGUN_PAUSE:
-         return sdl->mouse_m && sdl->mouse_l; 
+         return sdl->mouse_m && sdl->mouse_l;
    }
 
    return 0;
@@ -311,6 +309,8 @@ static void sdl_poll_mouse(sdl_input_t *sdl)
    sdl->mouse_l  = (SDL_BUTTON(SDL_BUTTON_LEFT)      & btn) ? 1 : 0;
    sdl->mouse_r  = (SDL_BUTTON(SDL_BUTTON_RIGHT)     & btn) ? 1 : 0;
    sdl->mouse_m  = (SDL_BUTTON(SDL_BUTTON_MIDDLE)    & btn) ? 1 : 0;
+   sdl->mouse_b4 = (SDL_BUTTON(SDL_BUTTON_X1)        & btn) ? 1 : 0;
+   sdl->mouse_b5 = (SDL_BUTTON(SDL_BUTTON_X2)        & btn) ? 1 : 0;
 #ifndef HAVE_SDL2
    sdl->mouse_wu = (SDL_BUTTON(SDL_BUTTON_WHEELUP)   & btn) ? 1 : 0;
    sdl->mouse_wd = (SDL_BUTTON(SDL_BUTTON_WHEELDOWN) & btn) ? 1 : 0;
@@ -404,7 +404,6 @@ input_driver_t input_sdl = {
    sdl_input_init,
    sdl_input_poll,
    sdl_input_state,
-   sdl_input_meta_key_pressed,
    sdl_input_free,
    NULL,
    NULL,

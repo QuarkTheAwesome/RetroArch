@@ -29,6 +29,7 @@
 #include <compat/strl.h>
 #include <retro_assert.h>
 #include <lists/string_list.h>
+#include <streams/interface_stream.h>
 #include <streams/file_stream.h>
 #include <rthreads/rthreads.h>
 #include <file/file_path.h>
@@ -78,7 +79,7 @@ struct sram_block
 
 typedef struct
 {
-   RFILE *file;
+   intfstream_t *file;
    char path[PATH_MAX_LENGTH];
    void *data;
    void *undo_data;
@@ -119,17 +120,15 @@ struct autosave_st
 struct autosave
 {
    volatile bool quit;
-   slock_t *lock;
-
-   slock_t *cond_lock;
-   scond_t *cond;
-   sthread_t *thread;
-
+   size_t bufsize;
+   unsigned interval;
    void *buffer;
    const void *retro_buffer;
    const char *path;
-   size_t bufsize;
-   unsigned interval;
+   slock_t *lock;
+   slock_t *cond_lock;
+   scond_t *cond;
+   sthread_t *thread;
 };
 
 static struct autosave_st autosave_state;
@@ -159,7 +158,8 @@ static void autosave_thread(void *data)
       if (differ)
       {
          /* Should probably deal with this more elegantly. */
-         RFILE *file = filestream_open(save->path, RFILE_MODE_WRITE, -1);
+         intfstream_t *file = intfstream_open_file(save->path,
+               RETRO_VFS_FILE_ACCESS_WRITE, RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
          if (file)
          {
@@ -175,10 +175,10 @@ static void autosave_thread(void *data)
             else
                RARCH_LOG("SRAM changed ... autosaving ...\n");
 
-            failed |= filestream_write(file, save->buffer, save->bufsize)
-               != save->bufsize;
-            failed |= filestream_flush(file) != 0;
-            failed |= filestream_close(file) != 0;
+            failed |= ((size_t)intfstream_write(file, save->buffer, save->bufsize) != save->bufsize);
+            failed |= (intfstream_flush(file) != 0);
+            failed |= (intfstream_close(file) != 0);
+            free(file);
             if (failed)
                RARCH_WARN("Failed to autosave SRAM. Disk might be full.\n");
          }
@@ -187,8 +187,11 @@ static void autosave_thread(void *data)
       slock_lock(save->cond_lock);
 
       if (!save->quit)
-         scond_wait_timeout(save->cond, save->cond_lock,
-               save->interval * 1000000LL);
+#if defined(_MSC_VER) && _MSC_VER <= 1200
+         scond_wait_timeout(save->cond, save->cond_lock, save->interval * 1000000);
+#else
+         scond_wait_timeout(save->cond, save->cond_lock, save->interval * 1000000LL);
+#endif
 
       slock_unlock(save->cond_lock);
    }
@@ -210,15 +213,16 @@ static autosave_t *autosave_new(const char *path,
       const void *data, size_t size,
       unsigned interval)
 {
-   autosave_t *handle            = (autosave_t*)calloc(1, sizeof(*handle));
+   autosave_t *handle            = (autosave_t*)malloc(sizeof(*handle));
    if (!handle)
       goto error;
 
+   handle->quit                  = false;
    handle->bufsize               = size;
    handle->interval              = interval;
-   handle->path                  = path;
    handle->buffer                = malloc(size);
    handle->retro_buffer          = data;
+   handle->path                  = path;
 
    if (!handle->buffer)
       goto error;
@@ -228,7 +232,6 @@ static autosave_t *autosave_new(const char *path,
    handle->lock                  = slock_new();
    handle->cond_lock             = slock_new();
    handle->cond                  = scond_new();
-
    handle->thread                = sthread_create(autosave_thread, handle);
 
    return handle;
@@ -273,8 +276,10 @@ bool autosave_init(void)
    if (autosave_interval < 1 || !task_save_files)
       return false;
 
-   list = (autosave_t**)calloc(task_save_files->size,
-               sizeof(*autosave_state.list));
+   list                       = (autosave_t**)
+      calloc(task_save_files->size,
+            sizeof(*autosave_state.list));
+
    if (!list)
       return false;
 
@@ -398,9 +403,9 @@ bool content_undo_load_state(void)
          undo_load_buf.size,
          msg_hash_to_str(MSG_BYTES));
 
-   /* TODO/FIXME - This checking of SRAM overwrite, 
+   /* TODO/FIXME - This checking of SRAM overwrite,
     * the backing up of it and
-    * its flushing could all be in their 
+    * its flushing could all be in their
     * own functions... */
    if (settings->bools.block_sram_overwrite && task_save_files
          && task_save_files->size)
@@ -527,7 +532,8 @@ static void task_save_handler_finished(retro_task_t *task,
 
    task_set_finished(task, true);
 
-   filestream_close(state->file);
+   intfstream_close(state->file);
+   free(state->file);
 
    if (!task_get_error(task) && task_get_cancelled(task))
       task_set_error(task, strdup("Task canceled"));
@@ -562,14 +568,15 @@ static void task_save_handler(retro_task_t *task)
 
    if (!state->file)
    {
-      state->file = filestream_open(state->path, RFILE_MODE_WRITE, -1);
+      state->file = intfstream_open_file(state->path, RETRO_VFS_FILE_ACCESS_WRITE,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
       if (!state->file)
          return;
    }
 
    remaining       = MIN(state->size - state->written, SAVE_STATE_CHUNK);
-   written         = (int)filestream_write(state->file,
+   written         = (int)intfstream_write(state->file,
          (uint8_t*)state->data + state->written, remaining);
 
    state->written += written;
@@ -578,7 +585,7 @@ static void task_save_handler(retro_task_t *task)
 
    if (task_get_cancelled(task) || written != remaining)
    {
-      char err[PATH_MAX_LENGTH];
+      char err[256];
 
       err[0] = '\0';
 
@@ -621,9 +628,15 @@ static void task_save_handler(retro_task_t *task)
       }
 
       if (!task_get_mute(task) && msg)
+      {
          task_set_title(task, msg);
+         msg = NULL;
+      }
 
       task_save_handler_finished(task, state);
+
+      if (!string_is_empty(msg))
+         free(msg);
 
       return;
    }
@@ -702,7 +715,10 @@ static void task_load_handler_finished(retro_task_t *task,
    task_set_finished(task, true);
 
    if (state->file)
-      filestream_close(state->file);
+   {
+      intfstream_close(state->file);
+      free(state->file);
+   }
 
    if (!task_get_error(task) && task_get_cancelled(task))
       task_set_error(task, strdup("Task canceled"));
@@ -728,20 +744,22 @@ static void task_load_handler(retro_task_t *task)
 
    if (!state->file)
    {
-      state->file = filestream_open(state->path, RFILE_MODE_READ, -1);
+      state->file = intfstream_open_file(state->path,
+            RETRO_VFS_FILE_ACCESS_READ,
+            RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
       if (!state->file)
          goto error;
 
-      if (filestream_seek(state->file, 0, SEEK_END) != 0)
+      if (intfstream_seek(state->file, 0, SEEK_END) != 0)
          goto error;
 
-      state->size = filestream_tell(state->file);
+      state->size = intfstream_tell(state->file);
 
       if (state->size < 0)
          goto error;
 
-      filestream_rewind(state->file);
+      intfstream_rewind(state->file);
 
       state->data = malloc(state->size + 1);
 
@@ -750,7 +768,7 @@ static void task_load_handler(retro_task_t *task)
    }
 
    remaining          = MIN(state->size - state->bytes_read, SAVE_STATE_CHUNK);
-   bytes_read         = filestream_read(state->file,
+   bytes_read         = intfstream_read(state->file,
          (uint8_t*)state->data + state->bytes_read, remaining);
    state->bytes_read += bytes_read;
 
@@ -761,15 +779,18 @@ static void task_load_handler(retro_task_t *task)
    {
       if (state->autoload)
       {
-         char msg[1024];
+         char *msg = (char*)malloc(1024 * sizeof(char));
 
          msg[0] = '\0';
 
-         snprintf(msg, sizeof(msg), "%s \"%s\" %s.",
+         snprintf(msg,
+               1024 * sizeof(char),
+               "%s \"%s\" %s.",
                msg_hash_to_str(MSG_AUTOLOADING_SAVESTATE_FROM),
                state->path,
                msg_hash_to_str(MSG_FAILED));
          task_set_error(task, strdup(msg));
+         free(msg);
       }
       else
          task_set_error(task, strdup(msg_hash_to_str(MSG_FAILED_TO_LOAD_STATE)));
@@ -782,7 +803,7 @@ static void task_load_handler(retro_task_t *task)
 
    if (state->bytes_read == state->size)
    {
-      char msg[1024];
+      char *msg = (char*)malloc(1024 * sizeof(char));
 
       msg[0] = '\0';
 
@@ -790,7 +811,9 @@ static void task_load_handler(retro_task_t *task)
 
       if (state->autoload)
       {
-         snprintf(msg, sizeof(msg), "%s \"%s\" %s.",
+         snprintf(msg,
+               1024 * sizeof(char),
+               "%s \"%s\" %s.",
                msg_hash_to_str(MSG_AUTOLOADING_SAVESTATE_FROM),
                state->path,
                msg_hash_to_str(MSG_SUCCEEDED));
@@ -798,9 +821,13 @@ static void task_load_handler(retro_task_t *task)
       else
       {
          if (state->state_slot < 0)
-            strlcpy(msg, msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT_AUTO), sizeof(msg));
+            strlcpy(msg, msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT_AUTO),
+                  1024 * sizeof(char)
+                  );
          else
-            snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT),
+            snprintf(msg,
+                  1024 * sizeof(char),
+                  msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT),
                   state->state_slot);
 
       }
@@ -808,6 +835,7 @@ static void task_load_handler(retro_task_t *task)
       if (!task_get_mute(task))
          task_set_title(task, strdup(msg));
 
+      free(msg);
       task_load_handler_finished(task, state);
 
       return;
@@ -1147,7 +1175,7 @@ bool content_save_state(const char *path, bool save_to_disk, bool autosave)
    {
       if (save_to_disk)
       {
-         if (path_file_exists(path) && !autosave)
+         if (filestream_exists(path) && !autosave)
          {
             /* Before overwritting the savestate file, load it into a buffer
             to allow undo_save_state() to work */
@@ -1244,10 +1272,10 @@ error:
 bool content_rename_state(const char *origin, const char *dest)
 {
    int ret = 0;
-   if (path_file_exists(dest))
-      unlink(dest);
+   if (filestream_exists(dest))
+      filestream_delete(dest);
 
-   ret = rename (origin, dest);
+   ret = filestream_rename(origin, dest);
    if (!ret)
       return true;
 
@@ -1363,29 +1391,44 @@ static bool dump_to_file_desperate(const void *data,
       size_t size, unsigned type)
 {
    time_t time_;
-   char timebuf[256];
-   char application_data[PATH_MAX_LENGTH];
-   char path[PATH_MAX_LENGTH];
+   char *path             = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
+   char *timebuf          = (char*)malloc(256 * sizeof(char));
+   char *application_data = (char*)malloc(PATH_MAX_LENGTH * sizeof(char));
 
    timebuf[0] = application_data[0] = path[0] = '\0';
 
    if (!fill_pathname_application_data(application_data,
-            sizeof(application_data)))
-      return false;
+            PATH_MAX_LENGTH * sizeof(char)))
+      goto error;
 
-   snprintf(path, sizeof(path), "%s/RetroArch-recovery-%u",
-      application_data, type);
+   snprintf(path,
+         PATH_MAX_LENGTH * sizeof(char),
+         "%s/RetroArch-recovery-%u",
+         application_data, type);
 
    time(&time_);
 
-   strftime(timebuf, sizeof(timebuf), "%Y-%m-%d-%H-%M-%S", localtime(&time_));
-   strlcat(path, timebuf, sizeof(path));
+   strftime(timebuf,
+         256 * sizeof(char),
+         "%Y-%m-%d-%H-%M-%S", localtime(&time_));
+   strlcat(path, timebuf,
+         PATH_MAX_LENGTH * sizeof(char)
+         );
 
    if (!filestream_write_file(path, data, size))
-      return false;
+      goto error;
 
+   free(application_data);
+   free(timebuf);
    RARCH_WARN("Succeeded in saving RAM data to \"%s\".\n", path);
+   free(path);
    return true;
+
+error:
+   free(application_data);
+   free(timebuf);
+   free(path);
+   return false;
 }
 
 /**
@@ -1410,7 +1453,8 @@ bool content_save_ram_file(unsigned slot)
          msg_hash_to_str(MSG_TO),
          ram.path);
 
-   if (!filestream_write_file(ram.path, mem_info.data, mem_info.size))
+   if (!filestream_write_file(
+            ram.path, mem_info.data, mem_info.size))
    {
       RARCH_ERR("%s.\n",
             msg_hash_to_str(MSG_FAILED_TO_SAVE_SRAM));
@@ -1419,7 +1463,8 @@ bool content_save_ram_file(unsigned slot)
       /* In case the file could not be written to,
        * the fallback function 'dump_to_file_desperate'
        * will be called. */
-      if (!dump_to_file_desperate(mem_info.data, mem_info.size, ram.type))
+      if (!dump_to_file_desperate(
+               mem_info.data, mem_info.size, ram.type))
       {
          RARCH_WARN("Failed ... Cannot recover save file.\n");
       }
@@ -1437,7 +1482,8 @@ bool event_save_files(void)
 {
    unsigned i;
 
-   if (!task_save_files || !rarch_ctl(RARCH_CTL_IS_SRAM_USED, NULL))
+   if (!task_save_files ||
+         !rarch_ctl(RARCH_CTL_IS_SRAM_USED, NULL))
       return false;
 
    for (i = 0; i < task_save_files->size; i++)
@@ -1450,7 +1496,8 @@ bool event_load_save_files(void)
 {
    unsigned i;
 
-   if (!task_save_files || rarch_ctl(RARCH_CTL_IS_SRAM_LOAD_DISABLED, NULL))
+   if (!task_save_files ||
+         rarch_ctl(RARCH_CTL_IS_SRAM_LOAD_DISABLED, NULL))
       return false;
 
    for (i = 0; i < task_save_files->size; i++)
@@ -1462,7 +1509,8 @@ bool event_load_save_files(void)
 void path_init_savefile_rtc(const char *savefile_path)
 {
    union string_list_elem_attr attr;
-   char savefile_name_rtc[PATH_MAX_LENGTH];
+   char *savefile_name_rtc = (char*)
+      malloc(PATH_MAX_LENGTH * sizeof(char));
 
    savefile_name_rtc[0] = '\0';
 
@@ -1474,8 +1522,9 @@ void path_init_savefile_rtc(const char *savefile_path)
    fill_pathname(savefile_name_rtc,
          savefile_path,
          file_path_str(FILE_PATH_RTC_EXTENSION),
-         sizeof(savefile_name_rtc));
+         PATH_MAX_LENGTH * sizeof(char));
    string_list_append(task_save_files, savefile_name_rtc, attr);
+   free(savefile_name_rtc);
 }
 
 void path_deinit_savefile(void)

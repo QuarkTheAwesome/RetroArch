@@ -4,7 +4,7 @@
 
 #include "ibxm.h"
 
-const char *IBXM_VERSION = "ibxm/ac mod/xm/s3m replay 20170704 (c)mumart@gmail.com";
+const char *IBXM_VERSION = "ibxm/ac mod/xm/s3m replay 20170901 (c)mumart@gmail.com";
 
 static const int FP_SHIFT = 15, FP_ONE = 32768, FP_MASK = 32767;
 
@@ -92,7 +92,7 @@ static char* data_ascii( struct data *data, int offset, int length, char *dest )
 	if( offset > data->length ) {
 		offset = data->length;
 	}
-	if( offset + length > data->length ) {
+	if( ( unsigned int ) offset + length > ( unsigned int ) data->length ) {
 		length = data->length - offset;
 	}
 	for( idx = 0; idx < length; idx++ ) {
@@ -190,7 +190,7 @@ static int envelope_next_tick( struct envelope *envelope, int tick, int key_on )
 	}
 	return tick;
 }
-	
+
 static int envelope_calculate_ampl( struct envelope *envelope, int tick ) {
 	int idx, point, dt, da;
 	int ampl = envelope->points_ampl[ envelope->num_points - 1 ];

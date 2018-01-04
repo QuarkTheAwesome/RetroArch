@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 
+#include <boolean.h>
 #include <file/archive_file.h>
 #include <streams/file_stream.h>
 #include <retro_miscellaneous.h>
@@ -31,12 +32,19 @@
 #include <lists/string_list.h>
 #include <file/file_path.h>
 #include <compat/strl.h>
-#include "../../deps/7zip/7z.h"
-#include "../../deps/7zip/7zCrc.h"
-#include "../../deps/7zip/7zFile.h"
+#include <7zip/7z.h>
+#include <7zip/7zCrc.h>
+#include <7zip/7zFile.h>
 
 #define SEVENZIP_MAGIC "7z\xBC\xAF\x27\x1C"
 #define SEVENZIP_MAGIC_LEN 6
+
+/* Assume W-functions do not work below Win2K and Xbox platforms */
+#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0500 || defined(_XBOX)
+#ifndef LEGACY_WIN32
+#define LEGACY_WIN32
+#endif
+#endif
 
 struct sevenzip_context_t {
    CFileInStream archiveStream;
@@ -126,6 +134,9 @@ static int sevenzip_file_read(
    CSzArEx db;
    uint8_t *output      = 0;
    long outsize         = -1;
+#ifndef LEGACY_WIN32
+   wchar_t *pathW       = NULL;
+#endif
 
    /*These are the allocation routines.
     * Currently using the non-standard 7zip choices. */
@@ -134,12 +145,31 @@ static int sevenzip_file_read(
    allocTempImp.Alloc   = sevenzip_stream_alloc_tmp_impl;
    allocTempImp.Free    = sevenzip_stream_free_impl;
 
+#if defined(_WIN32) && defined(USE_WINDOWS_FILE) && !defined(LEGACY_WIN32)
+   if (!string_is_empty(path))
+   {
+      pathW = utf8_to_utf16_string_alloc(path);
+
+      if (pathW)
+      {
+         /* Could not open 7zip archive? */
+         if (InFile_OpenW(&archiveStream.file, pathW))
+         {
+            free(pathW);
+            return -1;
+         }
+
+         free(pathW);
+      }
+   }
+#else
    /* Could not open 7zip archive? */
    if (InFile_Open(&archiveStream.file, path))
       return -1;
+#endif
 
    FileInStream_CreateVTable(&archiveStream);
-   LookToRead_CreateVTable(&lookStream, False);
+   LookToRead_CreateVTable(&lookStream, false);
    lookStream.realStream = &archiveStream.s;
    LookToRead_Init(&lookStream);
    CrcGenerateTable();
@@ -324,6 +354,9 @@ static int sevenzip_parse_file_init(file_archive_transfer_t *state,
 {
    struct sevenzip_context_t *sevenzip_context =
          (struct sevenzip_context_t*)sevenzip_stream_new();
+#ifndef LEGACY_WIN32
+   wchar_t *fileW = NULL;
+#endif
 
    if (state->archive_size < SEVENZIP_MAGIC_LEN)
       goto error;
@@ -333,12 +366,31 @@ static int sevenzip_parse_file_init(file_archive_transfer_t *state,
 
    state->stream = sevenzip_context;
 
+#if defined(_WIN32) && defined(USE_WINDOWS_FILE) && !defined(LEGACY_WIN32)
+   if (!string_is_empty(file))
+   {
+      fileW = utf8_to_utf16_string_alloc(file);
+
+      if (fileW)
+      {
+         /* could not open 7zip archive? */
+         if (InFile_OpenW(&sevenzip_context->archiveStream.file, fileW))
+         {
+            free(fileW);
+            goto error;
+         }
+
+         free(fileW);
+      }
+   }
+#else
    /* could not open 7zip archive? */
    if (InFile_Open(&sevenzip_context->archiveStream.file, file))
       goto error;
+#endif
 
    FileInStream_CreateVTable(&sevenzip_context->archiveStream);
-   LookToRead_CreateVTable(&sevenzip_context->lookStream, False);
+   LookToRead_CreateVTable(&sevenzip_context->lookStream, false);
    sevenzip_context->lookStream.realStream = &sevenzip_context->archiveStream.s;
    LookToRead_Init(&sevenzip_context->lookStream);
    CrcGenerateTable();

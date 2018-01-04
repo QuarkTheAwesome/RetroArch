@@ -25,7 +25,7 @@
 #include "../menu_cbs.h"
 #include "../menu_setting.h"
 
-#include "../../input/input_config.h"
+#include "../../input/input_driver.h"
 
 #include "../../configuration.h"
 #include "../../tasks/tasks_internal.h"
@@ -37,7 +37,7 @@
 #endif
 
 #ifdef HAVE_LIBRETRODB
-static void handle_dbscan_finished(void *task_data, void *user_data, const char *err)
+void handle_dbscan_finished(void *task_data, void *user_data, const char *err)
 {
    menu_ctx_environment_t menu_environ;
    menu_environ.type = MENU_ENVIRON_RESET_HORIZONTAL_LIST;
@@ -130,7 +130,9 @@ static int action_scan_input_desc(const char *path,
       unsigned char player_no_str = atoi(&label[1]);
 
       inp_desc_user      = (unsigned)(player_no_str - 1);
-      key                = (unsigned)(idx - 6);
+      /* This hardcoded value may cause issues if any entries are added on
+         top of the input binds */
+      key                = (unsigned)(idx - 7);
    }
    else
       key = input_config_translate_str_to_bind_id(label);
@@ -142,6 +144,7 @@ static int action_scan_input_desc(const char *path,
       target->key     = RETROK_UNKNOWN;
       target->joykey  = NO_BTN;
       target->joyaxis = AXIS_NONE;
+      target->mbutton = NO_BTN;
    }
 
    return 0;

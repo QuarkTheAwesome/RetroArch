@@ -23,7 +23,6 @@
 #include "../menu_driver.h"
 
 #include "../../input/input_driver.h"
-#include "../../input/input_config.h"
 
 #include "../../configuration.h"
 #include "../../performance_counters.h"
@@ -31,9 +30,11 @@
 #define MENU_MAX_BUTTONS 219
 #define MENU_MAX_AXES    32
 #define MENU_MAX_HATS    4
+#define MENU_MAX_MBUTTONS 32 /*enough to cover largest libretro constant*/
 
 struct menu_bind_state_port
 {
+   bool mbuttons[MENU_MAX_MBUTTONS];
    bool buttons[MENU_MAX_BUTTONS];
    int16_t axes[MENU_MAX_AXES];
    uint16_t hats[MENU_MAX_HATS];
@@ -73,7 +74,7 @@ static bool menu_input_key_bind_custom_bind_keyboard_cb(
    menu_input_binds.target->key = (enum retro_key)code;
    menu_input_binds.begin++;
    menu_input_binds.target++;
-   
+
    rarch_timer_begin_new_time(&menu_input_binds.timer, settings->uints.input_bind_timeout);
 
    return (menu_input_binds.begin <= menu_input_binds.last);
@@ -83,12 +84,14 @@ static int menu_input_key_bind_set_mode_common(
       enum menu_input_binds_ctl_state state,
       rarch_setting_t  *setting)
 {
+   menu_displaylist_info_t info;
    unsigned bind_type            = 0;
-   menu_displaylist_info_t info  = {0};
    struct retro_keybind *keybind = NULL;
    unsigned         index_offset = setting->index_offset;
    file_list_t *menu_stack       = menu_entries_get_menu_stack_ptr(0);
    size_t selection              = menu_navigation_get_selection();
+
+   menu_displaylist_info_init(&info);
 
    switch (state)
    {
@@ -109,11 +112,11 @@ static int menu_input_key_bind_set_mode_common(
          info.type                = MENU_SETTINGS_CUSTOM_BIND_KEYBOARD;
          info.directory_ptr       = selection;
          info.enum_idx            = MENU_ENUM_LABEL_CUSTOM_BIND;
-         strlcpy(info.label,
-               msg_hash_to_str(MENU_ENUM_LABEL_CUSTOM_BIND), sizeof(info.label));
-
+         info.label               = strdup(
+               msg_hash_to_str(MENU_ENUM_LABEL_CUSTOM_BIND));
          if (menu_displaylist_ctl(DISPLAYLIST_INFO, &info))
             menu_displaylist_process(&info);
+         menu_displaylist_info_free(&info);
          break;
       case MENU_INPUT_BINDS_CTL_BIND_ALL:
          menu_input_binds.target  = &input_config_binds[index_offset][0];
@@ -124,12 +127,12 @@ static int menu_input_key_bind_set_mode_common(
          info.type                = MENU_SETTINGS_CUSTOM_BIND_KEYBOARD;
          info.directory_ptr       = selection;
          info.enum_idx            = MENU_ENUM_LABEL_CUSTOM_BIND_ALL;
-         strlcpy(info.label,
-               msg_hash_to_str(MENU_ENUM_LABEL_CUSTOM_BIND_ALL),
-               sizeof(info.label));
+         info.label               = strdup(
+               msg_hash_to_str(MENU_ENUM_LABEL_CUSTOM_BIND_ALL));
 
          if (menu_displaylist_ctl(DISPLAYLIST_INFO, &info))
             menu_displaylist_process(&info);
+         menu_displaylist_info_free(&info);
          break;
       default:
       case MENU_INPUT_BINDS_CTL_BIND_NONE:
@@ -205,7 +208,10 @@ static void menu_input_key_bind_poll_bind_state(
       unsigned port,
       bool timed_out)
 {
+   unsigned b;
    rarch_joypad_info_t joypad_info;
+   const input_driver_t *input_ptr         = input_get_ptr();
+   void *input_data                        = input_get_data();
    const input_device_driver_t *joypad     =
       input_driver_get_joypad_driver();
    const input_device_driver_t *sec_joypad =
@@ -216,11 +222,17 @@ static void menu_input_key_bind_poll_bind_state(
 
    memset(state->state, 0, sizeof(state->state));
 
+    /* poll mouse (on the relevant port) */
+    for (b = 0; b < MENU_MAX_MBUTTONS; b++)
+        state->state[port].mbuttons[b] =
+           input_mouse_button_raw(port, b);
+
    joypad_info.joy_idx        = 0;
    joypad_info.auto_binds     = NULL;
    joypad_info.axis_threshold = 0.0f;
 
-   state->skip = timed_out || current_input->input_state(current_input_data, joypad_info,
+   state->skip = timed_out || input_ptr->input_state(input_data,
+         joypad_info,
          NULL,
          0, RETRO_DEVICE_KEYBOARD, 0, RETROK_RETURN);
 
@@ -275,6 +287,30 @@ static bool menu_input_key_bind_poll_find_trigger_pad(
       &new_state->state[p];
    const struct menu_bind_state_port *o = (const struct menu_bind_state_port*)
       &state->state[p];
+
+   for (b = 0; b < MENU_MAX_MBUTTONS; b++)
+   {
+      bool iterate = n->mbuttons[b] && !o->mbuttons[b];
+
+      if (!iterate)
+         continue;
+
+      switch ( b )
+      {
+
+	  case RETRO_DEVICE_ID_MOUSE_LEFT:
+	  case RETRO_DEVICE_ID_MOUSE_RIGHT:
+	  case RETRO_DEVICE_ID_MOUSE_MIDDLE:
+	  case RETRO_DEVICE_ID_MOUSE_BUTTON_4:
+	  case RETRO_DEVICE_ID_MOUSE_BUTTON_5:
+	  case RETRO_DEVICE_ID_MOUSE_WHEELUP:
+	  case RETRO_DEVICE_ID_MOUSE_WHEELDOWN:
+	  case RETRO_DEVICE_ID_MOUSE_HORIZ_WHEELUP:
+	  case RETRO_DEVICE_ID_MOUSE_HORIZ_WHEELDOWN:
+		  state->target->mbutton = b;
+		  return true;
+	  }
+   }
 
    for (b = 0; b < MENU_MAX_BUTTONS; b++)
    {
@@ -397,7 +433,7 @@ bool menu_input_key_bind_iterate(menu_input_ctx_bind_t *bind)
    }
 
    snprintf(bind->s, bind->len,
-         "[%s]\npress keyboard or joypad\n(timeout %d %s)",
+         "[%s]\npress keyboard, mouse or joypad\n(timeout %d %s)",
          input_config_bind_map_get_desc(
             menu_input_binds.begin - MENU_SETTINGS_BIND_BEGIN),
          rarch_timer_get_timeout(&menu_input_binds.timer),

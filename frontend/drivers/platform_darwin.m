@@ -48,8 +48,10 @@
 
 #include <boolean.h>
 #include <compat/apple_compat.h>
+#include <retro_assert.h>
 #include <retro_miscellaneous.h>
 #include <file/file_path.h>
+#include <streams/file_stream.h>
 #include <rhash.h>
 
 #ifdef HAVE_MENU
@@ -335,6 +337,15 @@ static void frontend_darwin_get_environment_settings(int *argc, char *argv[],
    CFSearchPathForDirectoriesInDomains(CFDocumentDirectory,
          CFUserDomainMask, 1, home_dir_buf, sizeof(home_dir_buf));
 
+#if TARGET_OS_IPHONE
+   char resolved_home_dir_buf[PATH_MAX_LENGTH] = {0};
+   if (realpath(home_dir_buf, resolved_home_dir_buf)) {
+      retro_assert(strlcpy(home_dir_buf,
+            resolved_home_dir_buf,
+            sizeof(home_dir_buf)) < sizeof(home_dir_buf));
+   }
+#endif
+
    strlcat(home_dir_buf, "/RetroArch", sizeof(home_dir_buf));
    fill_pathname_join(g_defaults.dirs[DEFAULT_DIR_SHADER],
          home_dir_buf, "shaders_glsl",
@@ -406,7 +417,7 @@ static void frontend_darwin_get_environment_settings(int *argc, char *argv[],
 
     fill_pathname_join(assets_zip_path, bundle_path_buf, "assets.zip", sizeof(assets_zip_path));
     
-    if (path_file_exists(assets_zip_path))
+    if (filestream_exists(assets_zip_path))
     {
        settings_t *settings = config_get_ptr();
 

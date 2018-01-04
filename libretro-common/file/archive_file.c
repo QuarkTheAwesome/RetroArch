@@ -195,7 +195,7 @@ static int file_archive_get_file_list_cb(
 
       if (!file_ext)
          goto error;
-      
+
       if (!string_list_find_elem_prefix(ext_list, ".", file_ext))
       {
          /* keep iterating */
@@ -401,7 +401,7 @@ int file_archive_parse_file_iterate(
          {
             const struct file_archive_file_backend *backend =
                file_archive_get_file_backend(file);
-            int ret                                         = 
+            int ret                                         =
                backend->archive_parse_file_iterate_step(state,
                   valid_exts, userdata, file_cb);
 
@@ -538,7 +538,7 @@ bool file_archive_extract_file(
    userdata.decomp_state.opt_file           = NULL;
    userdata.decomp_state.needle             = NULL;
    userdata.decomp_state.size               = 0;
-   userdata.decomp_state.found              = NULL;
+   userdata.decomp_state.found              = false;
 
    if (!list)
    {
@@ -602,7 +602,7 @@ struct string_list *file_archive_get_file_list(const char *path,
    userdata.decomp_state.opt_file           = NULL;
    userdata.decomp_state.needle             = NULL;
    userdata.decomp_state.size               = 0;
-   userdata.decomp_state.found              = NULL;
+   userdata.decomp_state.found              = false;
 
    if (!userdata.list)
       goto error;
@@ -734,7 +734,7 @@ int file_archive_compressed_read(
     * hoping that optional_filename is the
     * same as requested.
     */
-   if (optional_filename && path_file_exists(optional_filename))
+   if (optional_filename && filestream_exists(optional_filename))
    {
       *length = 0;
       string_list_free(str_list);

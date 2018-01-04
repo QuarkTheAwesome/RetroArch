@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 
-#include "../input_config.h"
+#include "../input_driver.h"
 #include "../../tasks/tasks_internal.h"
 
 static uint64_t pad_state[MAX_PADS];
@@ -76,9 +76,14 @@ static bool xdk_joypad_button(unsigned port_num, uint16_t joykey)
    return pad_state[port_num] & (UINT64_C(1) << joykey);
 }
 
-static uint64_t xdk_joypad_get_buttons(unsigned port_num)
+static void xdk_joypad_get_buttons(unsigned port_num, retro_bits_t *state)
 {
-   return pad_state[port_num];
+	if (port_num < MAX_PADS)
+   {
+		BITS_COPY16_PTR( state, pad_state[port_num] );
+	}
+   else
+      BIT256_CLEAR_ALL_PTR(state);
 }
 
 static int16_t xdk_joypad_axis(unsigned port_num, uint32_t joyaxis)
@@ -135,13 +140,22 @@ static void xdk_joypad_poll(void)
 #endif
 
 #if defined(_XBOX1)
+#ifdef __cplusplus
    XGetDeviceChanges(XDEVICE_TYPE_GAMEPAD,
          reinterpret_cast<PDWORD>(&dwInsertions),
          reinterpret_cast<PDWORD>(&dwRemovals));
+#else
+   XGetDeviceChanges(XDEVICE_TYPE_GAMEPAD,
+         (PDWORD)&dwInsertions,
+         (PDWORD)&dwRemovals);
+#endif
 #endif
 
    for (port = 0; port < MAX_PADS; port++)
    {
+	  unsigned i, j;
+      XINPUT_STATE state_tmp;
+      uint64_t *state_cur    = NULL;
 #ifdef _XBOX1
       XINPUT_CAPABILITIES caps[MAX_PADS];
       (void)caps;
@@ -151,7 +165,7 @@ static void xdk_joypad_poll(void)
 
       if(bRemoved[port])
       {
-         /* if the controller was removed after 
+         /* if the controller was removed after
           * XGetDeviceChanges but before
           * XInputOpen, the device handle will be NULL. */
          if(gamepads[port])
@@ -175,19 +189,17 @@ static void xdk_joypad_poll(void)
          m_pollingParameters.bOutputInterval = 8;
          gamepads[port] = XInputOpen(XDEVICE_TYPE_GAMEPAD, port,
                XDEVICE_NO_SLOT, NULL);
-         
+
          xdk_joypad_autodetect_add(port);
       }
 
       if (!gamepads[port])
          continue;
 
-      /* if the controller is removed after 
+      /* if the controller is removed after
        * XGetDeviceChanges but before XInputOpen,
        * the device handle will be NULL. */
 #endif
-
-      XINPUT_STATE state_tmp;
 
 #if defined(_XBOX1)
       if (XInputPoll(gamepads[port]) != ERROR_SUCCESS)
@@ -200,7 +212,7 @@ static void xdk_joypad_poll(void)
          continue;
 #endif
 
-      uint64_t *state_cur = &pad_state[port];
+      state_cur  = &pad_state[port];
 
       *state_cur = 0;
       *state_cur |= ((state_tmp.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) ? (UINT64_C(1) << RETRO_DEVICE_ID_JOYPAD_LEFT) : 0);
@@ -237,8 +249,8 @@ static void xdk_joypad_poll(void)
       analog_state[port][RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_X] = state_tmp.Gamepad.sThumbRX;
       analog_state[port][RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_Y] = state_tmp.Gamepad.sThumbRY;
 
-      for (int i = 0; i < 2; i++)
-         for (int j = 0; j < 2; j++)
+      for (i = 0; i < 2; i++)
+         for (j = 0; j < 2; j++)
             if (analog_state[port][i][j] == -0x8000)
                analog_state[port][i][j] = -0x7fff;
    }
