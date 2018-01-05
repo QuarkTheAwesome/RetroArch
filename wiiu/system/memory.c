@@ -247,8 +247,18 @@ void * _realloc_r(struct _reent *r, void *ptr, size_t size)
    if (!ptr)
       return _malloc_r(r, size);
 
-   if (_malloc_usable_size_r(r, ptr) >= size)
+   if (_malloc_usable_size_r(r, ptr) >= size) {
+      for (int i = 0; i < LSAN_ALLOCS_SZ; i++) {
+         if (lsan_allocs[i].addr == ptr) {
+            lsan_allocs[i].size = size;
+            break;
+         }
+      }
+      for (size_t i = 0; i < size; i++) {
+         SET_SHADOW(MEM_TO_SHADOW(ptr + i), ptr + i);
+      }
       return ptr;
+   }
 
    void *realloc_ptr = _malloc_r(r, size);
 
