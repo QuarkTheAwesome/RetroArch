@@ -57,6 +57,7 @@
 #include <wiiu/ios.h>
 #include <wiiu/vpad.h>
 #include <wiiu/kpad.h>
+#include <wiiu/os/debug.h>
 
 #include <fat.h>
 #include <iosuhax.h>
@@ -314,6 +315,7 @@ static volatile int wiiu_log_lock = 0;
 
 void wiiu_log_init(const char *ipString, int port)
 {
+#if defined(HAVE_NETWORKING)
    wiiu_log_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
    if (wiiu_log_socket < 0)
@@ -330,6 +332,7 @@ void wiiu_log_init(const char *ipString, int port)
       socketclose(wiiu_log_socket);
       wiiu_log_socket = -1;
    }
+#endif
 }
 
 void wiiu_log_deinit(void)
@@ -345,7 +348,7 @@ static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_
    char outbuf[len + 1];
    snprintf(outbuf, len, "%s", ptr);
    OSReport(outbuf);
-
+#if defined(HAVE_NETWORKING)
    if (wiiu_log_socket < 0)
       return len;
 
@@ -371,6 +374,7 @@ static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_
    wiiu_log_lock = 0;
 
    return len;
+#endif
 }
 void net_print(const char *str)
 {
@@ -380,7 +384,9 @@ void net_print(const char *str)
 void net_print_exp(const char *str)
 {
    OSReport(str);
+#if defined(HAVE_NETWORKING)
    send(wiiu_log_socket, str, strlen(str), 0);
+#endif
 }
 
 #if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
@@ -419,7 +425,9 @@ int main(int argc, char **argv)
 #ifdef IS_SALAMANDER
    socket_lib_init();
 #else
+#if defined(HAVE_NETWORKING)
    network_init();
+#endif
 #endif
 #if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
    wiiu_log_init(PC_DEVELOPMENT_IP_ADDRESS, PC_DEVELOPMENT_TCP_PORT);
@@ -593,10 +601,10 @@ static int iosuhaxMount = 0;
 
 static void fsdev_init(void)
 {
-   /*iosuhaxMount = 0;
+   iosuhaxMount = 0;
    int res = IOSUHAX_Open(NULL);
 
-   if (res < 0)
+   /*if (res < 0)
       res = MCPHookOpen();*/
 
    if (res < 0)
@@ -614,10 +622,10 @@ static void fsdev_exit(void)
       fatUnmount("sd:");
       fatUnmount("usb:");
 
-      /*if (mcp_hook_fd >= 0)
+      if (mcp_hook_fd >= 0)
          MCPHookClose();
       else
-         IOSUHAX_Close();*/
+         IOSUHAX_Close();
    }
    else
       unmount_sd_fat("sd");

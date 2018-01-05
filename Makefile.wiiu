@@ -61,7 +61,7 @@ ifeq ($(SALAMANDER_BUILD),1)
    OBJ += verbosity.o
 else
    DEFINES += -DRARCH_INTERNAL
-   DEFINES += -DHAVE_KEYMAPPER
+  # DEFINES += -DHAVE_KEYMAPPER
    DEFINES += -DHAVE_UPDATE_ASSETS
    DEFINES += -DHAVE_FILTERS_BUILTIN
 
@@ -86,7 +86,7 @@ else
    	HAVE_ZLIB = 1
    	HAVE_7ZIP = 1
    	HAVE_BUILTINZLIB = 1
-   	HAVE_KEYMAPPER = 1
+   	HAVE_KEYMAPPER = 0
    	HAVE_LIBRETRODB = 1
    	HAVE_ZARCH = 0
    	HAVE_MATERIALUI = 1
@@ -95,7 +95,8 @@ else
    #	HAVE_FREETYPE = 1
    	HAVE_LANGEXTRA = 1
    	HAVE_LIBRETRODB = 1
-   	HAVE_NETWORKING = 1
+   #	Decaf doesn't have nsysnet :/
+   #	HAVE_NETWORKING = 1
    	HAVE_CHEEVOS = 1
    #	WANT_IFADDRS = 1
    	HAVE_OVERLAY = 1
@@ -165,7 +166,7 @@ endif
 INCDIRS := -I. -Ideps -Ideps/stb -Ideps/libz -Ideps/7zip -Ilibretro-common/include -Iwiiu -Iwiiu/include -I$(DEVKITPRO)/portlibs/ppc/include
 LIBDIRS := -L. -L$(DEVKITPRO)/portlibs/ppc/lib
 
-CFLAGS  := -mwup -mcpu=750 -meabi -mhard-float
+CFLAGS  := -mwup -mcpu=750 -meabi -mhard-float -fsanitize=kernel-address
 LDFLAGS :=
 
 ifeq ($(DEBUG), 1)
@@ -229,7 +230,6 @@ all: $(TARGETS)
 %: $(BUILD_DIR)/%
 	cp $< $@
 
-
 $(BUILD_DIR)/%.o: %.cpp %.depend
 	@$(if $(Q), echo CXX $<,)
 	@mkdir -p $(dir $@)
@@ -238,7 +238,7 @@ $(BUILD_DIR)/%.o: %.cpp %.depend
 $(BUILD_DIR)/%.o: %.c %.depend
 	@$(if $(Q), echo CC $<,)
 	@mkdir -p $(dir $@)
-	$(Q)$(CC) -c -o $@ $< $(CFLAGS) $(DEFINES) $(INCDIRS) $(DEPFLAGS)
+	$(Q)$(CC) -c -o $@ $< $(CFLAGS) $(DEFINES) $(INCDIRS) $(DEPFLAGS) $(if $(filter objs/wiiu/wiiu/system/memory.o,$@),-fno-sanitize=all)
 
 $(BUILD_DIR)/%.o: %.S %.depend
 	@$(if $(Q), echo AS $<,)

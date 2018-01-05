@@ -66,6 +66,7 @@ IMPORT(MEMGetSizeForMBlockExpHeap);
 IMPORT(MEMAllocFromFrmHeapEx);
 IMPORT(MEMFreeToFrmHeap);
 IMPORT(MEMGetAllocatableSizeForFrmHeapEx);
+IMPORT(MEMGetAllocatableSizeForExpHeapEx);
 
 IMPORT(FSInit);
 IMPORT(FSShutdown);
@@ -110,7 +111,8 @@ IMPORT(IMDisableDim);
 IMPORT_END();
 
 /* nsysnet */
-IMPORT_BEGIN(nsysnet);
+//DECAF DOESN'T HAVE NSYSNET?
+/*IMPORT_BEGIN(nsysnet);
 
 IMPORT(socket_lib_init);
 IMPORT(getaddrinfo);
@@ -142,7 +144,7 @@ IMPORT(socket);
 IMPORT(select);
 IMPORT(socketlasterr);
 
-IMPORT_END();
+IMPORT_END();*/
 
 /* gx2 */
 IMPORT_BEGIN(gx2);
