@@ -498,7 +498,7 @@ static void gdi_set_osd_msg(void *data,
       const char *msg,
       const void *params, void *font)
 {
-   font_driver_render_msg(video_info, font, msg, params);
+   font_driver_render_msg(video_info, font, msg, (const struct font_params *)params);
 }
 
 static void gdi_get_video_output_size(void *data,
@@ -533,11 +533,13 @@ static void gdi_set_video_mode(void *data, unsigned width, unsigned height,
 }
 
 static const video_poke_interface_t gdi_poke_interface = {
+   NULL, /* get_flags */
    NULL,                      /* set_coords */
    NULL,                      /* set_mvp */
    NULL,
    NULL,
    gdi_set_video_mode,
+   win32_get_refresh_rate,
    NULL,
    gdi_get_video_output_size,
    gdi_get_video_output_prev,
@@ -550,11 +552,10 @@ static const video_poke_interface_t gdi_poke_interface = {
    NULL,
    gdi_set_osd_msg,
    NULL,
-
-   NULL,
-#ifdef HAVE_MENU
-   NULL,
-#endif
+   NULL,                         /* grab_mouse_toggle */
+   NULL,                         /* get_current_shader */
+   NULL,                         /* get_current_software_framebuffer */
+   NULL                          /* get_hw_render_interface */
 };
 
 static void gdi_gfx_get_poke_interface(void *data,

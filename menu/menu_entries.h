@@ -22,7 +22,7 @@
 #include <boolean.h>
 #include <retro_common_api.h>
 
-#include "widgets/menu_list.h"
+#include <lists/file_list.h>
 
 #include "menu_setting.h"
 #include "menu_displaylist.h"
@@ -51,6 +51,31 @@ enum menu_entries_ctl_state
    MENU_ENTRIES_CTL_CLEAR,
    MENU_ENTRIES_CTL_SHOW_BACK
 };
+
+enum menu_list_type
+{
+   MENU_LIST_PLAIN = 0,
+   MENU_LIST_HORIZONTAL,
+   MENU_LIST_TABS
+};
+
+typedef struct menu_list menu_list_t;
+
+typedef struct menu_ctx_list
+{
+   enum menu_list_type type;
+   const char *path;
+   char       *fullpath;
+   const char *label;
+   unsigned entry_type;
+   unsigned action;
+   size_t idx;
+   size_t selection;
+   size_t size;
+   size_t list_size;
+   void *entry;
+   file_list_t *list;
+} menu_ctx_list_t;
 
 typedef struct menu_file_list_cbs
 {
@@ -114,8 +139,6 @@ typedef struct menu_file_list_cbs
 } menu_file_list_cbs_t;
 
 int menu_entries_get_title(char *title, size_t title_len);
-
-bool menu_entries_current_core_is_no_core(void);
 
 int menu_entries_get_core_title(char *title_msg, size_t title_msg_len);
 

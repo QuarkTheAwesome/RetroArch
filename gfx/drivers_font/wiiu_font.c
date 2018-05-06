@@ -97,11 +97,14 @@ static void wiiu_font_free_font(void* data, bool is_threaded)
    if (!font)
       return;
 
-   if (font->font_driver && font->font_data)
+   if (font->font_driver && font->font_data &&
+         font->font_driver->free)
       font->font_driver->free(font->font_data);
 
-   MEM1_free(font->texture.surface.image);
-   MEM1_free(font->ubo_tex);
+   if (font->texture.surface.image)
+      MEM1_free(font->texture.surface.image);
+   if (font->ubo_tex)
+      MEM1_free(font->ubo_tex);
    free(font);
 }
 
@@ -147,13 +150,14 @@ static void wiiu_font_render_line(
       float pos_y, unsigned text_align)
 {
    unsigned i;
-   wiiu_video_t* wiiu = (wiiu_video_t*)video_driver_get_ptr(false);
+   wiiu_video_t* wiiu = (wiiu_video_t*)video_info->userdata;
    unsigned width   = video_info->width;
    unsigned height  = video_info->height;
    int x            = roundf(pos_x * width);
    int y            = roundf((1.0 - pos_y) * height);
 
-   if(wiiu->vertex_cache.current + (msg_len * 4) > wiiu->vertex_cache.size)
+   if(  !wiiu ||
+         wiiu->vertex_cache.current + (msg_len * 4) > wiiu->vertex_cache.size)
       return;
 
    switch (text_align)
@@ -285,15 +289,15 @@ static void wiiu_font_render_message(
 static void wiiu_font_render_msg(
       video_frame_info_t *video_info,
       void* data, const char* msg,
-      const void* userdata)
+      const struct font_params *params)
 {
    float x, y, scale, drop_mod, drop_alpha;
    int drop_x, drop_y;
    unsigned max_glyphs;
    enum text_alignment text_align;
-   unsigned color, color_dark, r, g, b, alpha, r_dark, g_dark, b_dark, alpha_dark;
-   wiiu_font_t                * font = (wiiu_font_t*)data;
-   const struct font_params* params = (const struct font_params*)userdata;
+   unsigned color, color_dark, r, g, b,
+            alpha, r_dark, g_dark, b_dark, alpha_dark;
+   wiiu_font_t                *font = (wiiu_font_t*)data;
    unsigned width                   = video_info->width;
    unsigned height                  = video_info->height;
 
@@ -310,6 +314,7 @@ static void wiiu_font_render_msg(
       drop_y         = params->drop_y;
       drop_mod       = params->drop_mod;
       drop_alpha     = params->drop_alpha;
+
       r              = FONT_COLOR_GET_RED(params->color);
       g              = FONT_COLOR_GET_GREEN(params->color);
       b              = FONT_COLOR_GET_BLUE(params->color);

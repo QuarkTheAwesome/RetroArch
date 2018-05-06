@@ -1,4 +1,4 @@
-/* Copyright (C) 2010-2017 The RetroArch team
+/* Copyright (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this libretro SDK code part (glsm).
@@ -2207,7 +2207,7 @@ static bool glsm_state_ctx_init(void *data)
 #ifdef CORE
    hw_render.context_type       = RETRO_HW_CONTEXT_OPENGL_CORE;
    hw_render.version_major      = 3;
-   hw_render.version_minor      = 1;
+   hw_render.version_minor      = 3;
 #else
    hw_render.context_type       = RETRO_HW_CONTEXT_OPENGL;
 #endif
@@ -2217,7 +2217,7 @@ static bool glsm_state_ctx_init(void *data)
    hw_render.stencil            = params->stencil;
    hw_render.depth              = true;
    hw_render.bottom_left_origin = true;
-   hw_render.cache_context      = true;
+   hw_render.cache_context      = false;
 
    if (!params->environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
       return false;

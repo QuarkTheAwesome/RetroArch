@@ -39,20 +39,23 @@
 #include <string.h> /* for memset/memcpy() */
 #include <sys/stat.h> /* for stat() */
 #include <sys/types.h> /* for off_t */
-#include "share/compat.h"
-#include "FLAC/assert.h"
-#include "share/alloc.h"
-#include "protected/stream_decoder.h"
-#include "private/bitreader.h"
-#include "private/bitmath.h"
-#include "private/cpu.h"
-#include "private/crc.h"
-#include "private/fixed.h"
-#include "private/format.h"
-#include "private/lpc.h"
-#include "private/md5.h"
-#include "private/memory.h"
-#include "private/macros.h"
+
+#include <retro_miscellaneous.h>
+
+#include "include/share/compat.h"
+#include "include/FLAC/assert.h"
+#include "include/share/alloc.h"
+#include "include/protected/stream_decoder.h"
+#include "include/private/bitreader.h"
+#include "include/private/bitmath.h"
+#include "include/private/cpu.h"
+#include "include/private/crc.h"
+#include "include/private/fixed.h"
+#include "include/private/format.h"
+#include "include/private/lpc.h"
+#include "include/private/md5.h"
+#include "include/private/memory.h"
+#include "include/private/macros.h"
 
 
 /* technically this should be in an "export.c" but this is convenient enough */
@@ -2758,7 +2761,7 @@ FLAC__bool read_residual_partitioned_rice_(FLAC__StreamDecoder *decoder, unsigne
 	/* invalid predictor and partition orders mush be handled in the callers */
 	FLAC__ASSERT(partition_order > 0? partition_samples >= predictor_order : decoder->private_->frame.header.blocksize >= predictor_order);
 
-	if(!FLAC__format_entropy_coding_method_partitioned_rice_contents_ensure_size(partitioned_rice_contents, flac_max(6u, partition_order))) {
+	if(!FLAC__format_entropy_coding_method_partitioned_rice_contents_ensure_size(partitioned_rice_contents, MAX(6u, partition_order))) {
 		decoder->protected_->state = FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR;
 		return false;
 	}

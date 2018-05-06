@@ -41,14 +41,17 @@
 #include "../../defaults.h"
 #include "../../retroarch.h"
 #include "../../verbosity.h"
+#include "../../ui/drivers/ui_win32.h"
 
 /* We only load this library once, so we let it be
  * unloaded at application shutdown, since unloading
  * it early seems to cause issues on some systems.
  */
 
+#ifdef HAVE_DYNAMIC
 static dylib_t dwmlib;
 static dylib_t shell32lib;
+#endif
 
 VOID (WINAPI *DragAcceptFiles_func)(HWND, BOOL);
 
@@ -58,12 +61,14 @@ static bool console_needs_free;
 
 static void gfx_dwm_shutdown(void)
 {
+#ifdef HAVE_DYNAMIC
    if (dwmlib)
       dylib_close(dwmlib);
    if (shell32lib)
       dylib_close(shell32lib);
    dwmlib     = NULL;
    shell32lib = NULL;
+#endif
 }
 
 static bool gfx_init_dwm(void)
@@ -76,6 +81,7 @@ static bool gfx_init_dwm(void)
 
    atexit(gfx_dwm_shutdown);
 
+#ifdef HAVE_DYNAMIC
    shell32lib = dylib_load("shell32.dll");
    if (!shell32lib)
    {
@@ -91,13 +97,20 @@ static bool gfx_init_dwm(void)
 
    DragAcceptFiles_func =
       (VOID (WINAPI*)(HWND, BOOL))dylib_proc(shell32lib, "DragAcceptFiles");
-
+   
    mmcss =
-      (HRESULT (WINAPI*)(BOOL))dylib_proc(dwmlib, "DwmEnableMMCSS");
+	   (HRESULT(WINAPI*)(BOOL))dylib_proc(dwmlib, "DwmEnableMMCSS");
+#else
+   DragAcceptFiles_func = DragAcceptFiles;
+#if 0
+   mmcss                = DwmEnableMMCSS;
+#endif
+#endif
+
    if (mmcss)
    {
-      RARCH_LOG("Setting multimedia scheduling for DWM.\n");
-      mmcss(TRUE);
+	   RARCH_LOG("Setting multimedia scheduling for DWM.\n");
+	   mmcss(TRUE);
    }
 
    inited = true;
@@ -116,8 +129,11 @@ static void gfx_set_dwm(void)
    if (settings->bools.video_disable_composition == dwm_composition_disabled)
       return;
 
+#ifdef HAVE_DYNAMIC
    composition_enable =
       (HRESULT (WINAPI*)(UINT))dylib_proc(dwmlib, "DwmEnableComposition");
+#endif
+
    if (!composition_enable)
    {
       RARCH_ERR("Did not find DwmEnableComposition ...\n");
@@ -132,15 +148,15 @@ static void gfx_set_dwm(void)
 
 static void frontend_win32_get_os(char *s, size_t len, int *major, int *minor)
 {
-   char buildStr[11] = {0};
-   bool server = false;
-   const char *arch = "";
-   bool serverR2 = false;
+   char buildStr[11]      = {0};
+   bool server            = false;
+   const char *arch       = "";
+   bool serverR2          = false;
 
 #if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0500
    /* Windows 2000 and later */
-   SYSTEM_INFO si = {0};
-   OSVERSIONINFOEX vi = {0};
+   SYSTEM_INFO si         = {{0}};
+   OSVERSIONINFOEX vi     = {0};
    vi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
 
    GetSystemInfo(&si);
@@ -292,22 +308,22 @@ static void frontend_win32_init(void *data)
 {
 	typedef BOOL (WINAPI *isProcessDPIAwareProc)();
 	typedef BOOL (WINAPI *setProcessDPIAwareProc)();
+#ifdef HAVE_DYNAMIC
 	HMODULE handle                         =
       GetModuleHandle("User32.dll");
 	isProcessDPIAwareProc  isDPIAwareProc  =
       (isProcessDPIAwareProc)dylib_proc(handle, "IsProcessDPIAware");
 	setProcessDPIAwareProc setDPIAwareProc =
       (setProcessDPIAwareProc)dylib_proc(handle, "SetProcessDPIAware");
+#else
+	isProcessDPIAwareProc  isDPIAwareProc  = IsProcessDPIAware;
+	setProcessDPIAwareProc setDPIAwareProc = SetProcessDPIAware;
+#endif
 
 	if (isDPIAwareProc)
-	{
 		if (!isDPIAwareProc())
-		{
 			if (setDPIAwareProc)
 				setDPIAwareProc();
-		}
-	}
-
 }
 
 enum frontend_powerstate frontend_win32_get_powerstate(int *seconds, int *percent)
@@ -343,7 +359,7 @@ enum frontend_architecture frontend_win32_get_architecture(void)
 {
 #if defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0500
    /* Windows 2000 and later */
-   SYSTEM_INFO si = {0};
+   SYSTEM_INFO si = {{0}};
 
    GetSystemInfo(&si);
 
@@ -569,5 +585,7 @@ frontend_ctx_driver_t frontend_ctx_win32 = {
    NULL,                            /* destroy_sighandler_state */
    frontend_win32_attach_console,   /* attach_console */
    frontend_win32_detach_console,   /* detach_console */
+   NULL,                            /* watch_path_for_changes */
+   NULL,                            /* check_for_path_changes */
    "win32"
 };

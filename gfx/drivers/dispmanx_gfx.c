@@ -631,11 +631,13 @@ static void dispmanx_set_aspect_ratio (void *data, unsigned aspect_ratio_idx)
 }
 
 static const video_poke_interface_t dispmanx_poke_interface = {
+   NULL, /* get_flags */
    NULL,  /* set_coords */
    NULL,  /* set_mvp    */
    NULL,
    NULL,
    NULL, /* set_video_mode */
+   NULL, /* get_refresh_rate */
    NULL, /* set_filtering */
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
@@ -646,8 +648,12 @@ static const video_poke_interface_t dispmanx_poke_interface = {
    NULL, /* dispmanx_apply_state_changes */
    dispmanx_set_texture_frame,
    dispmanx_set_texture_enable,
-   NULL, /* dispmanx_set_osd_msg */
-   NULL  /* dispmanx_show_mouse */
+   NULL,                         /* set_osd_msg */
+   NULL,                         /* show_mouse */
+   NULL,                         /* grab_mouse_toggle */
+   NULL,                         /* get_current_shader */
+   NULL,                         /* get_current_software_framebuffer */
+   NULL                          /* get_hw_render_interface */
 };
 
 static void dispmanx_gfx_get_poke_interface(void *data,

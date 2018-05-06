@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (rpng_encode.c).
@@ -354,7 +354,8 @@ static bool rpng_save_image(const char *path,
       GOTO_END_ERROR();
 
 end:
-   filestream_close(file);
+   if (file)
+      filestream_close(file);
    free(encode_buf);
    free(deflate_buf);
    free(rgba_line);

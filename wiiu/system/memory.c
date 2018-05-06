@@ -244,6 +244,7 @@ size_t _malloc_usable_size_r(struct _reent *r, void *ptr)
 
 void * _realloc_r(struct _reent *r, void *ptr, size_t size)
 {
+   void *realloc_ptr = NULL;
    if (!ptr)
       return _malloc_r(r, size);
 
@@ -260,7 +261,7 @@ void * _realloc_r(struct _reent *r, void *ptr, size_t size)
       return ptr;
    }
 
-   void *realloc_ptr = _malloc_r(r, size);
+   realloc_ptr = _malloc_r(r, size);
 
    if(!realloc_ptr)
       return NULL;
@@ -275,9 +276,8 @@ void* _calloc_r(struct _reent *r, size_t num, size_t size)
 {
    void *ptr = _malloc_r(r, num*size);
 
-   if(ptr) {
+   if(ptr)
       memset(ptr, 0, num*size);
-   }
 
    return ptr;
 }
@@ -288,9 +288,8 @@ void * _valloc_r(struct _reent *r, size_t size)
 }
 
 
-//!-------------------------------------------------------------------------------------------
-//! some wrappers
-//!-------------------------------------------------------------------------------------------
+/* some wrappers */
+
 void * MEM2_alloc(unsigned int size, unsigned int align)
 {
     return _memalign_r(NULL, align, size);
@@ -306,26 +305,28 @@ void MEM2_free(void *ptr)
 
 void * MEM1_alloc(unsigned int size, unsigned int align)
 {
-    if (align < 4)
-        align = 4;
-    return MEMAllocFromExpHeapEx(mem1_heap, size, align);
+   if (align < 4)
+      align = 4;
+   return MEMAllocFromExpHeapEx(mem1_heap, size, align);
 }
 
 void MEM1_free(void *ptr)
 {
-    MEMFreeToExpHeap(mem1_heap, ptr);
+   if (ptr)
+      MEMFreeToExpHeap(mem1_heap, ptr);
 }
 
 void * MEMBucket_alloc(unsigned int size, unsigned int align)
 {
-    if (align < 4)
-        align = 4;
-    return MEMAllocFromExpHeapEx(bucket_heap, size, align);
+   if (align < 4)
+      align = 4;
+   return MEMAllocFromExpHeapEx(bucket_heap, size, align);
 }
 
 void MEMBucket_free(void *ptr)
 {
-    MEMFreeToExpHeap(bucket_heap, ptr);
+   if (ptr)
+      MEMFreeToExpHeap(bucket_heap, ptr);
 }
 
 typedef struct _framerec

@@ -143,7 +143,7 @@ void path_set_redirect(void)
       }
    }
 
-   /* Set savefile directory if empty based on content directory */
+   /* Set savefile directory if empty to content directory */
    if (string_is_empty(new_savefile_dir) || settings->bools.savefiles_in_content_dir)
    {
       strlcpy(new_savefile_dir, path_main_basename,
@@ -254,31 +254,41 @@ void path_set_special(char **argv, unsigned num_content)
 {
    unsigned i;
    union string_list_elem_attr attr;
+   struct string_list* subsystem_paths = NULL;
+   char str[PATH_MAX_LENGTH];
    global_t   *global   = global_get_ptr();
+
 
    /* First content file is the significant one. */
    path_set_basename(argv[0]);
 
    subsystem_fullpaths = string_list_new();
+   subsystem_paths = string_list_new();
    retro_assert(subsystem_fullpaths);
 
    attr.i = 0;
 
    for (i = 0; i < num_content; i++)
+   {
       string_list_append(subsystem_fullpaths, argv[i], attr);
+      strlcpy(str, argv[i], sizeof(str));
+      path_remove_extension(str);
+      string_list_append(subsystem_paths, path_basename(str), attr);
+   }
+   str[0] = '\0';
+   string_list_join_concat(str, sizeof(str), subsystem_paths, " + ");
 
    /* We defer SRAM path updates until we can resolve it.
     * It is more complicated for special content types. */
    if (global)
    {
-      if (!retroarch_override_setting_is_set(RARCH_OVERRIDE_SETTING_STATE_PATH, NULL))
-         fill_pathname_noext(global->name.savestate, path_main_basename,
-               file_path_str(FILE_PATH_STATE_EXTENSION),
+      if(path_is_directory(dir_get(RARCH_DIR_CURRENT_SAVESTATE)))
+         strlcpy(global->name.savestate, dir_get(RARCH_DIR_CURRENT_SAVESTATE),
                sizeof(global->name.savestate));
-
       if (path_is_directory(global->name.savestate))
       {
-         fill_pathname_dir(global->name.savestate, path_main_basename,
+         fill_pathname_dir(global->name.savestate,
+               str,
                file_path_str(FILE_PATH_STATE_EXTENSION),
                sizeof(global->name.savestate));
          RARCH_LOG("%s \"%s\".\n",
@@ -286,6 +296,7 @@ void path_set_special(char **argv, unsigned num_content)
                global->name.savestate);
       }
    }
+   free(subsystem_paths);
 }
 
 static bool path_init_subsystem(void)
@@ -297,7 +308,6 @@ static bool path_init_subsystem(void)
 
    if (!system || path_is_empty(RARCH_PATH_SUBSYSTEM))
       return false;
-
    /* For subsystems, we know exactly which RAM types are supported. */
 
    info = libretro_find_subsystem_info(
@@ -306,7 +316,6 @@ static bool path_init_subsystem(void)
          path_get(RARCH_PATH_SUBSYSTEM));
 
    /* We'll handle this error gracefully later. */
-
    if (info)
    {
       unsigned num_content = MIN(info->num_roms,
@@ -319,6 +328,7 @@ static bool path_init_subsystem(void)
          {
             union string_list_elem_attr attr;
             char ext[32];
+            char savename[PATH_MAX_LENGTH];
             size_t path_size = PATH_MAX_LENGTH * sizeof(char);
             char *path       = (char*)malloc(
                   PATH_MAX_LENGTH * sizeof(char));
@@ -329,21 +339,26 @@ static bool path_init_subsystem(void)
             path[0] = ext[0] = '\0';
 
             snprintf(ext, sizeof(ext), ".%s", mem->extension);
+            strlcpy(savename, subsystem_fullpaths->elems[i].data, sizeof(savename));
+            path_remove_extension(savename);
 
-            if (path_is_directory(dir_get(RARCH_DIR_SAVEFILE)))
+            if (path_is_directory(dir_get(RARCH_DIR_CURRENT_SAVEFILE)))
             {
                /* Use SRAM dir */
                /* Redirect content fullpath to save directory. */
-               strlcpy(path, dir_get(RARCH_DIR_SAVEFILE), path_size);
+               strlcpy(path, dir_get(RARCH_DIR_CURRENT_SAVEFILE), path_size);
                fill_pathname_dir(path,
-                     subsystem_fullpaths->elems[i].data, ext,
+                     savename, ext,
                      path_size);
             }
             else
             {
-               fill_pathname(path, subsystem_fullpaths->elems[i].data,
+               fill_pathname(path, savename,
                      ext, path_size);
             }
+            RARCH_LOG("%s \"%s\".\n",
+               msg_hash_to_str(MSG_REDIRECTING_SAVEFILE_TO),
+               path);
 
             attr.i = mem->type;
             string_list_append((struct string_list*)savefile_ptr_get(), path, attr);

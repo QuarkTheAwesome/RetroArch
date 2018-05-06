@@ -28,12 +28,6 @@
 
 RETRO_BEGIN_DECLS
 
-#define BOX_RADIAL       0x18df06d2U
-#define BOX_RECT         0x7c9d4d93U
-
-#define KEY_ANALOG_LEFT  0x56b92e81U
-#define KEY_ANALOG_RIGHT 0x2e4dc654U
-
 /* Overlay driver acts as a medium between input drivers
  * and video driver.
  *
@@ -92,6 +86,13 @@ enum overlay_image_transfer_status
    OVERLAY_IMAGE_TRANSFER_DESC_ITERATE,
    OVERLAY_IMAGE_TRANSFER_DESC_DONE,
    OVERLAY_IMAGE_TRANSFER_ERROR
+};
+
+enum overlay_visibility
+{
+   OVERLAY_VISIBILITY_DEFAULT = 0,
+   OVERLAY_VISIBILITY_VISIBLE,
+   OVERLAY_VISIBILITY_HIDDEN
 };
 
 struct overlay
@@ -176,7 +177,7 @@ struct overlay_desc
    unsigned retro_key_idx;
 
    /* This is a bit mask of all input binds to set with this overlay control */
-   retro_bits_t button_mask;
+   input_bits_t button_mask;
 
    char next_index_name[64];
 
@@ -256,6 +257,8 @@ bool input_overlay_key_pressed(input_overlay_t *ol, unsigned key);
 bool input_overlay_is_alive(input_overlay_t *ol);
 
 void input_overlay_loaded(void *task_data, void *user_data, const char *err);
+
+void input_overlay_set_visibility(int overlay_idx,enum overlay_visibility vis);
 
 /* FIXME - temporary. Globals are bad */
 extern input_overlay_t *overlay_ptr;

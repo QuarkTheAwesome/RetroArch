@@ -692,8 +692,10 @@ static void sdl2_poke_texture_enable(void *data,
 {
    sdl2_video_t *vid   = (sdl2_video_t*)data;
 
-   if (vid)
-      vid->menu.active = enable;
+   if (!vid)
+      return;
+
+   vid->menu.active = enable;
 }
 
 static void sdl2_poke_set_osd_msg(void *data,
@@ -706,7 +708,6 @@ static void sdl2_poke_set_osd_msg(void *data,
    RARCH_LOG("[SDL2]: OSD MSG: %s\n", msg);
 }
 
-#ifdef HAVE_MENU
 static void sdl2_show_mouse(void *data, bool state)
 {
    (void)data;
@@ -718,14 +719,15 @@ static void sdl2_grab_mouse_toggle(void *data)
    sdl2_video_t *vid = (sdl2_video_t*)data;
    SDL_SetWindowGrab(vid->window, SDL_GetWindowGrab(vid->window));
 }
-#endif
 
 static video_poke_interface_t sdl2_video_poke_interface = {
+   NULL, /* get_flags */
    NULL,       /* set_coords */
    NULL,       /* set_mvp */
    NULL,
    NULL,
    NULL,
+   NULL, /* get_refresh_rate */
    sdl2_poke_set_filtering,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
@@ -737,14 +739,11 @@ static video_poke_interface_t sdl2_video_poke_interface = {
    sdl2_poke_set_texture_frame,
    sdl2_poke_texture_enable,
    sdl2_poke_set_osd_msg,
-#ifdef HAVE_MENU
    sdl2_show_mouse,
    sdl2_grab_mouse_toggle,
-#else
-   NULL,
-   NULL,
-#endif
-   NULL,
+   NULL,                         /* get_current_shader */
+   NULL,                         /* get_current_software_framebuffer */
+   NULL                          /* get_hw_render_interface */
 };
 
 static void sdl2_gfx_poke_interface(void *data, const video_poke_interface_t **iface)

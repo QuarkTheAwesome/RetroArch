@@ -110,6 +110,7 @@ enum menu_displaylist_ctl_state
    DISPLAYLIST_ACHIEVEMENT_LIST,
       DISPLAYLIST_USER_BINDS_LIST,
    DISPLAYLIST_ACCOUNTS_LIST,
+   DISPLAYLIST_MIXER_STREAM_SETTINGS_LIST,
    DISPLAYLIST_DRIVER_SETTINGS_LIST,
    DISPLAYLIST_VIDEO_SETTINGS_LIST,
    DISPLAYLIST_CONFIGURATION_SETTINGS_LIST,
@@ -118,8 +119,10 @@ enum menu_displaylist_ctl_state
    DISPLAYLIST_FRAME_THROTTLE_SETTINGS_LIST,
    DISPLAYLIST_REWIND_SETTINGS_LIST,
    DISPLAYLIST_AUDIO_SETTINGS_LIST,
+   DISPLAYLIST_AUDIO_MIXER_SETTINGS_LIST,
    DISPLAYLIST_CORE_SETTINGS_LIST,
    DISPLAYLIST_INPUT_SETTINGS_LIST,
+   DISPLAYLIST_LATENCY_SETTINGS_LIST,
    DISPLAYLIST_INPUT_HOTKEY_BINDS_LIST,
    DISPLAYLIST_ONSCREEN_OVERLAY_SETTINGS_LIST,
    DISPLAYLIST_ONSCREEN_DISPLAY_SETTINGS_LIST,
@@ -153,6 +156,7 @@ enum menu_displaylist_ctl_state
    DISPLAYLIST_OPTIONS_MANAGEMENT,
    DISPLAYLIST_OPTIONS_DISK,
    DISPLAYLIST_OPTIONS_SHADERS,
+   DISPLAYLIST_OPTIONS_OVERRIDES,
    DISPLAYLIST_NETPLAY,
    DISPLAYLIST_ADD_CONTENT_LIST,
    DISPLAYLIST_CONFIGURATIONS_LIST,
@@ -174,6 +178,7 @@ typedef struct menu_displaylist_info
    bool need_refresh;
    bool need_entries_refresh;
    bool need_push;
+   bool need_push_no_playlist_entries;
    /* should we clear the displaylist before we push
     * entries onto it? */
    bool need_clear;
@@ -193,7 +198,6 @@ typedef struct menu_displaylist_info
    unsigned type;
    unsigned type_default;
    unsigned flags;
-   uint32_t label_hash;
    size_t directory_ptr;
    file_list_t *list;
    file_list_t *menu_list;

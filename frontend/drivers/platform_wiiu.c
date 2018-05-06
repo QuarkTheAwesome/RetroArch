@@ -57,7 +57,6 @@
 #include <wiiu/ios.h>
 #include <wiiu/vpad.h>
 #include <wiiu/kpad.h>
-#include <wiiu/os/debug.h>
 
 #include <fat.h>
 #include <iosuhax.h>
@@ -306,6 +305,8 @@ frontend_ctx_driver_t frontend_ctx_wiiu =
    NULL,                         /* destroy_signal_handler_state */
    NULL,                         /* attach_console */
    NULL,                         /* detach_console */
+   NULL,                         /* watch_path_for_changes */
+   NULL,                         /* check_for_path_changes */
    "wiiu",
    NULL,                         /* get_video_driver */
 };
@@ -315,7 +316,8 @@ static volatile int wiiu_log_lock = 0;
 
 void wiiu_log_init(const char *ipString, int port)
 {
-#if defined(HAVE_NETWORKING)
+   wiiu_log_lock = 0;
+
    wiiu_log_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
    if (wiiu_log_socket < 0)
@@ -332,7 +334,6 @@ void wiiu_log_init(const char *ipString, int port)
       socketclose(wiiu_log_socket);
       wiiu_log_socket = -1;
    }
-#endif
 }
 
 void wiiu_log_deinit(void)
@@ -345,10 +346,6 @@ void wiiu_log_deinit(void)
 }
 static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_t len)
 {
-   char outbuf[len + 1];
-   snprintf(outbuf, len, "%s", ptr);
-   OSReport(outbuf);
-#if defined(HAVE_NETWORKING)
    if (wiiu_log_socket < 0)
       return len;
 
@@ -375,7 +372,6 @@ static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_
    wiiu_log_lock = 0;
 
    return len;
-#endif
 }
 void net_print(const char *str)
 {
@@ -384,10 +380,7 @@ void net_print(const char *str)
 
 void net_print_exp(const char *str)
 {
-   OSReport(str);
-#if defined(HAVE_NETWORKING)
    send(wiiu_log_socket, str, strlen(str), 0);
-#endif
 }
 
 #if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
@@ -426,9 +419,7 @@ int main(int argc, char **argv)
 #ifdef IS_SALAMANDER
    socket_lib_init();
 #else
-#if defined(HAVE_NETWORKING)
    network_init();
-#endif
 #endif
 #if defined(PC_DEVELOPMENT_IP_ADDRESS) && defined(PC_DEVELOPMENT_TCP_PORT)
    wiiu_log_init(PC_DEVELOPMENT_IP_ADDRESS, PC_DEVELOPMENT_TCP_PORT);
@@ -443,7 +434,7 @@ int main(int argc, char **argv)
 #endif
    verbosity_enable();
    fflush(stdout);
-   /*DEBUG_VAR(ARGV_PTR);
+   DEBUG_VAR(ARGV_PTR);
    if(ARGV_PTR && ((u32)ARGV_PTR < 0x01000000))
    {
       struct
@@ -458,13 +449,11 @@ int main(int argc, char **argv)
          argv = param->argv;
       }
       ARGV_PTR = NULL;
-   }*/
+   }
 
    DEBUG_VAR(argc);
-   if (argc > 1) {
-      DEBUG_STR(argv[0]);
-      DEBUG_STR(argv[1]);
-   }
+   DEBUG_STR(argv[0]);
+   DEBUG_STR(argv[1]);
    fflush(stdout);
 #ifdef IS_SALAMANDER
    int salamander_main(int, char **);
@@ -515,11 +504,6 @@ int main(int argc, char **argv)
 #endif
 
    /* returning non 0 here can prevent loading a different rpx/elf in the HBL environment */
-   return 0;
-}
-
-unsigned long _times_r(struct _reent *r, struct tms *tmsbuf)
-{
    return 0;
 }
 
@@ -605,8 +589,8 @@ static void fsdev_init(void)
    iosuhaxMount = 0;
    int res = IOSUHAX_Open(NULL);
 
-   /*if (res < 0)
-      res = MCPHookOpen();*/
+   if (res < 0)
+      res = MCPHookOpen();
 
    if (res < 0)
       mount_sd_fat("sd");

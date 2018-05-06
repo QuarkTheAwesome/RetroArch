@@ -26,6 +26,7 @@
 #include "gfx/font_driver.h"
 #include "gfx/video_driver.h"
 #include "gfx/common/gx2_common.h"
+#include "wiiu/system/memory.h"
 #include "wiiu/wiiu_dbg.h"
 
 static const float *menu_display_wiiu_get_default_vertices(void)
@@ -38,100 +39,256 @@ static const float *menu_display_wiiu_get_default_tex_coords(void)
    return NULL;
 }
 
-static void *menu_display_wiiu_get_default_mvp(void)
+static void *menu_display_wiiu_get_default_mvp(video_frame_info_t *video_info)
 {
    return NULL;
 }
 
-static void menu_display_wiiu_blend_begin(void)
+static void menu_display_wiiu_blend_begin(video_frame_info_t *video_info)
 {
 
 }
 
-static void menu_display_wiiu_blend_end(void)
+static void menu_display_wiiu_blend_end(video_frame_info_t *video_info)
 {
 
 }
 
-static void menu_display_wiiu_viewport(void *data)
+static void menu_display_wiiu_viewport(void *data, video_frame_info_t *video_info)
 {
 
 }
 
 
-static void menu_display_wiiu_draw(void *data)
+static void menu_display_wiiu_draw(void *data, video_frame_info_t *video_info)
 {
-   GX2Texture *texture = NULL;
-   wiiu_video_t             *wiiu = (wiiu_video_t*)video_driver_get_ptr(false);
-   menu_display_ctx_draw_t *draw    = (menu_display_ctx_draw_t*)data;
+   wiiu_video_t             *wiiu  = video_info ? (wiiu_video_t*)video_info->userdata : NULL;
+   menu_display_ctx_draw_t *draw   = (menu_display_ctx_draw_t*)data;
 
 
    if (!wiiu || !draw)
       return;
 
-   texture            = (GX2Texture*)draw->texture;
-
-   if (!texture)
-      return;
-
-   if (wiiu->vertex_cache.current + 4 > wiiu->vertex_cache.size)
-      return;
-
-   sprite_vertex_t* v = wiiu->vertex_cache.v + wiiu->vertex_cache.current;
-
-   if(draw->coords->vertex && draw->coords->vertices == 4)
+   if(draw->pipeline.id)
    {
-      v->pos.x = MIN(MIN(MIN(draw->coords->vertex[0], draw->coords->vertex[2]), draw->coords->vertex[4]), draw->coords->vertex[6]);
-      v->pos.y = 1.0 - MAX(MAX(MAX(draw->coords->vertex[1], draw->coords->vertex[3]), draw->coords->vertex[5]), draw->coords->vertex[7]);
-      v->pos.width  = MAX(MAX(MAX(draw->coords->vertex[0], draw->coords->vertex[2]), draw->coords->vertex[4]), draw->coords->vertex[6]) - v->pos.x;
-      v->pos.height = 1.0 - MIN(MIN(MIN(draw->coords->vertex[1], draw->coords->vertex[3]), draw->coords->vertex[5]), draw->coords->vertex[7]) - v->pos.y;
-      v->pos.x *= wiiu->color_buffer.surface.width;
-      v->pos.y *= wiiu->color_buffer.surface.height;
-      v->pos.width *= wiiu->color_buffer.surface.width;
-      v->pos.height *= wiiu->color_buffer.surface.height;
+      GX2SetShaderMode(GX2_SHADER_MODE_UNIFORM_BLOCK);
+
+      switch(draw->pipeline.id)
+      {
+      case VIDEO_SHADER_MENU:
+         GX2SetShader(&ribbon_shader);
+         break;
+      case VIDEO_SHADER_MENU_2:
+         GX2SetShader(&ribbon_simple_shader);
+         break;
+      case VIDEO_SHADER_MENU_3:
+         GX2SetShader(&snow_simple_shader);
+         break;
+      case VIDEO_SHADER_MENU_4:
+         GX2SetShader(&snow_shader);
+         break;
+      case VIDEO_SHADER_MENU_5:
+         GX2SetShader(&bokeh_shader);
+         break;
+      case VIDEO_SHADER_MENU_6:
+         GX2SetShader(&snowflake_shader);
+         break;
+      default:
+         break;
+      }
+
+      switch(draw->pipeline.id)
+      {
+      case VIDEO_SHADER_MENU:
+      case VIDEO_SHADER_MENU_2:
+         GX2DrawEx(GX2_PRIMITIVE_MODE_TRIANGLE_STRIP, draw->coords->vertices, 0, 1);
+         GX2SetBlendControl(GX2_RENDER_TARGET_0, GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_INV_SRC_ALPHA,
+                            GX2_BLEND_COMBINE_MODE_ADD,
+                            GX2_ENABLE,          GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_INV_SRC_ALPHA,
+                            GX2_BLEND_COMBINE_MODE_ADD);
+      case VIDEO_SHADER_MENU_3:
+      case VIDEO_SHADER_MENU_4:
+      case VIDEO_SHADER_MENU_5:
+      case VIDEO_SHADER_MENU_6:
+         GX2DrawEx(GX2_PRIMITIVE_MODE_QUADS, 4, 0, 1);
+         break;
+      }
+
+
+   }
+   else if(draw->coords->vertex || draw->coords->color[0] != draw->coords->color[12])
+   {
+      if (wiiu->vertex_cache_tex.current + 4 > wiiu->vertex_cache_tex.size)
+         return;
+
+
+      tex_shader_vertex_t* v = wiiu->vertex_cache_tex.v + wiiu->vertex_cache_tex.current;
+
+
+      GX2SetShaderMode(GX2_SHADER_MODE_UNIFORM_BLOCK);
+      GX2SetShader(&tex_shader);
+      GX2SetVertexUniformBlock(tex_shader.vs.uniformBlocks[0].offset,
+                               tex_shader.vs.uniformBlocks[0].size,
+                               wiiu->ubo_mvp);
+      GX2SetAttribBuffer(0, wiiu->vertex_cache_tex.size * sizeof(*wiiu->vertex_cache_tex.v),
+                         sizeof(*wiiu->vertex_cache_tex.v), wiiu->vertex_cache_tex.v);
+
+      if(!draw->coords->vertex)
+      {
+         v[0].pos.x = 0.0f;
+         v[0].pos.y = 1.0f;
+         v[1].pos.x = 1.0f;
+         v[1].pos.y = 1.0f;
+         v[2].pos.x = 0.0f;
+         v[2].pos.y = 0.0f;
+         v[3].pos.x = 1.0f;
+         v[3].pos.y = 0.0f;
+      }
+      else
+      {
+         v[0].pos.x = draw->coords->vertex[0];
+         v[0].pos.y = 1.0 - draw->coords->vertex[1];
+         v[1].pos.x = draw->coords->vertex[2];
+         v[1].pos.y = 1.0 - draw->coords->vertex[3];
+         v[2].pos.x = draw->coords->vertex[4];
+         v[2].pos.y = 1.0 - draw->coords->vertex[5];
+         v[3].pos.x = draw->coords->vertex[6];
+         v[3].pos.y = 1.0 - draw->coords->vertex[7];
+      }
+
+      if(!draw->coords->tex_coord)
+      {
+         v[0].coord.u = 0.0f;
+         v[0].coord.v = 1.0f;
+         v[1].coord.u = 1.0f;
+         v[1].coord.v = 1.0f;
+         v[2].coord.u = 0.0f;
+         v[2].coord.v = 0.0f;
+         v[3].coord.u = 1.0f;
+         v[3].coord.v = 0.0f;
+      }
+      else
+      {
+         v[0].coord.u = draw->coords->tex_coord[0];
+         v[0].coord.v = draw->coords->tex_coord[1];
+         v[1].coord.u = draw->coords->tex_coord[2];
+         v[1].coord.v = draw->coords->tex_coord[3];
+         v[2].coord.u = draw->coords->tex_coord[4];
+         v[2].coord.v = draw->coords->tex_coord[5];
+         v[3].coord.u = draw->coords->tex_coord[6];
+         v[3].coord.v = draw->coords->tex_coord[7];
+      }
+
+      for(int i = 0; i < 4; i++)
+      {
+         v[i].color.r = draw->coords->color[(i << 2) + 0];
+         v[i].color.g = draw->coords->color[(i << 2) + 1];
+         v[i].color.b = draw->coords->color[(i << 2) + 2];
+         v[i].color.a = draw->coords->color[(i << 2) + 3];
+      }
+
+
+      if(draw->texture)
+         GX2SetPixelTexture((GX2Texture*)draw->texture, tex_shader.ps.samplerVars[0].location);
+
+      GX2DrawEx(GX2_PRIMITIVE_MODE_TRIANGLE_STRIP, 4, wiiu->vertex_cache_tex.current, 1);
+      wiiu->vertex_cache_tex.current += 4;
    }
    else
    {
+      if (wiiu->vertex_cache.current + 1 > wiiu->vertex_cache.size)
+         return;
+
+      sprite_vertex_t* v = wiiu->vertex_cache.v + wiiu->vertex_cache.current;
       v->pos.x = draw->x;
       v->pos.y = wiiu->color_buffer.surface.height - draw->y - draw->height;
       v->pos.width = draw->width;
       v->pos.height = draw->height;
-   }
-   if(draw->coords->tex_coord && draw->coords->vertices == 4)
-   {
-      v->coord.u = MIN(MIN(MIN(draw->coords->tex_coord[0], draw->coords->tex_coord[2]), draw->coords->tex_coord[4]), draw->coords->tex_coord[6]);
-      v->coord.v = MIN(MIN(MIN(draw->coords->tex_coord[1], draw->coords->tex_coord[3]), draw->coords->tex_coord[5]), draw->coords->tex_coord[7]);
-      v->coord.width  = MAX(MAX(MAX(draw->coords->tex_coord[0], draw->coords->tex_coord[2]), draw->coords->tex_coord[4]), draw->coords->tex_coord[6]) - v->coord.u;
-      v->coord.height = MAX(MAX(MAX(draw->coords->tex_coord[1], draw->coords->tex_coord[3]), draw->coords->tex_coord[5]), draw->coords->tex_coord[7]) - v->coord.v;
-   }
-   else
-   {
       v->coord.u = 0.0f;
       v->coord.v = 0.0f;
       v->coord.width = 1.0f;
       v->coord.height = 1.0f;
+
+      v->color = COLOR_RGBA(0xFF * draw->coords->color[0], 0xFF * draw->coords->color[1],
+                          0xFF * draw->coords->color[2], 0xFF * draw->coords->color[3]);
+
+      if(draw->texture)
+         GX2SetPixelTexture((GX2Texture*)draw->texture, sprite_shader.ps.samplerVars[0].location);
+
+      GX2DrawEx(GX2_PRIMITIVE_MODE_POINTS, 1, wiiu->vertex_cache.current, 1);
+      wiiu->vertex_cache.current ++;
+      return;
    }
 
 
-   v->color = COLOR_RGBA(0xFF * draw->coords->color[0], 0xFF * draw->coords->color[1],
-                       0xFF * draw->coords->color[2], 0xFF * draw->coords->color[3]);
 
-   GX2SetPixelTexture(texture, tex_shader.ps.samplerVars[0].location);
 
-   GX2DrawEx(GX2_PRIMITIVE_MODE_POINTS, 1, wiiu->vertex_cache.current, 1);
-
-#if 0
-   printf("(%i,%i,%i,%i) , (%i,%i)\n", (int)draw->x,
-         (int)draw->y, (int)draw->width, (int)draw->height,
-         texture->surface.width, texture->surface.height);
-#endif
-
-   wiiu->vertex_cache.current ++;
-
+   GX2SetShaderMode(GX2_SHADER_MODE_GEOMETRY_SHADER);
+   GX2SetShader(&sprite_shader);
+//      GX2SetGeometryShaderInputRingBuffer(wiiu->input_ring_buffer, wiiu->input_ring_buffer_size);
+//      GX2SetGeometryShaderOutputRingBuffer(wiiu->output_ring_buffer, wiiu->output_ring_buffer_size);
+   GX2SetVertexUniformBlock(sprite_shader.vs.uniformBlocks[0].offset,
+                            sprite_shader.vs.uniformBlocks[0].size,
+                            wiiu->ubo_vp);
+   GX2SetVertexUniformBlock(sprite_shader.vs.uniformBlocks[1].offset,
+                            sprite_shader.vs.uniformBlocks[1].size,
+                            wiiu->ubo_tex);
+   GX2SetAttribBuffer(0, wiiu->vertex_cache.size * sizeof(*wiiu->vertex_cache.v),
+                      sizeof(*wiiu->vertex_cache.v), wiiu->vertex_cache.v);
 }
 
-static void menu_display_wiiu_draw_pipeline(void *data)
+static void menu_display_wiiu_draw_pipeline(void *data, video_frame_info_t *video_info)
 {
+   menu_display_ctx_draw_t *draw  = (menu_display_ctx_draw_t*)data;
+   video_coord_array_t *ca        = NULL;
+   wiiu_video_t             *wiiu = video_info ? (wiiu_video_t*)video_info->userdata : NULL;
+
+   if (!wiiu || !draw)
+      return;
+
+   switch(draw->pipeline.id)
+   {
+   case VIDEO_SHADER_MENU:
+   case VIDEO_SHADER_MENU_2:
+      ca = menu_display_get_coords_array();
+      if(!wiiu->menu_shader_vbo)
+      {
+         wiiu->menu_shader_vbo = MEM2_alloc(ca->coords.vertices * 2 * sizeof(float), GX2_VERTEX_BUFFER_ALIGNMENT);
+         memcpy(wiiu->menu_shader_vbo, ca->coords.vertex, ca->coords.vertices * 2 * sizeof(float));
+         GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, wiiu->menu_shader_vbo, ca->coords.vertices * 2 * sizeof(float));
+      }
+
+      draw->coords->vertex             = wiiu->menu_shader_vbo;
+      draw->coords->vertices           = ca->coords.vertices;
+      GX2SetAttribBuffer(0, draw->coords->vertices * 2 * sizeof(float), 2 * sizeof(float), wiiu->menu_shader_vbo);
+      GX2SetBlendControl(GX2_RENDER_TARGET_0, GX2_BLEND_MODE_SRC_ALPHA, GX2_BLEND_MODE_ONE,
+                         GX2_BLEND_COMBINE_MODE_ADD, GX2_DISABLE, 0, 0, 0);
+
+      break;
+   case VIDEO_SHADER_MENU_3:
+   case VIDEO_SHADER_MENU_4:
+   case VIDEO_SHADER_MENU_5:
+   case VIDEO_SHADER_MENU_6:
+      GX2SetAttribBuffer(0, 4 * sizeof(*wiiu->v), sizeof(*wiiu->v), wiiu->v);
+      break;
+   default:
+      return;
+   }
+
+   if(!wiiu->menu_shader_ubo)
+   {
+      wiiu->menu_shader_ubo = MEM2_alloc(sizeof(*wiiu->menu_shader_ubo), GX2_UNIFORM_BLOCK_ALIGNMENT);
+      matrix_4x4_ortho(wiiu->menu_shader_ubo->mvp, 0, 1, 1, 0, -1, 1);
+      wiiu->menu_shader_ubo->OutputSize.width = wiiu->color_buffer.surface.width;
+      wiiu->menu_shader_ubo->OutputSize.height = wiiu->color_buffer.surface.height;
+      wiiu->menu_shader_ubo->time = 0.0f;
+   }
+   else
+      wiiu->menu_shader_ubo->time += 0.01f;
+
+   GX2Invalidate(GX2_INVALIDATE_MODE_CPU_UNIFORM_BLOCK, wiiu->menu_shader_ubo, sizeof(*wiiu->menu_shader_ubo));
+   GX2SetVertexUniformBlock(1, sizeof(*wiiu->menu_shader_ubo), wiiu->menu_shader_ubo);
+   GX2SetPixelUniformBlock(1, sizeof(*wiiu->menu_shader_ubo), wiiu->menu_shader_ubo);
 }
 
 static void menu_display_wiiu_restore_clear_color(void)
@@ -141,7 +298,9 @@ static void menu_display_wiiu_restore_clear_color(void)
 #endif
 }
 
-static void menu_display_wiiu_clear_color(menu_display_ctx_clearcolor_t *clearcolor)
+static void menu_display_wiiu_clear_color(
+      menu_display_ctx_clearcolor_t *clearcolor,
+      video_frame_info_t *video_info)
 {
    if (!clearcolor)
       return;
@@ -181,4 +340,5 @@ menu_display_ctx_driver_t menu_display_ctx_wiiu = {
    menu_display_wiiu_font_init_first,
    MENU_VIDEO_DRIVER_WIIU,
    "menu_display_wiiu",
+   true
 };

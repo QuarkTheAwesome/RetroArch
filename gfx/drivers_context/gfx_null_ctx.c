@@ -86,6 +86,11 @@ static bool gfx_ctx_null_suppress_screensaver(void *data, bool enable)
    return false;
 }
 
+static enum gfx_ctx_api gfx_ctx_null_get_api(void *data)
+{
+   return GFX_CTX_NONE;
+}
+
 static bool gfx_ctx_null_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
    (void)data;
@@ -131,10 +136,12 @@ static void gfx_ctx_null_set_flags(void *data, uint32_t flags)
 const gfx_ctx_driver_t gfx_ctx_null = {
    gfx_ctx_null_init,
    gfx_ctx_null_destroy,
+   gfx_ctx_null_get_api,
    gfx_ctx_null_bind_api,
    gfx_ctx_null_swap_interval,
    gfx_ctx_null_set_video_mode,
    gfx_ctx_null_get_video_size,
+   NULL, /* get_refresh_rate */
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */

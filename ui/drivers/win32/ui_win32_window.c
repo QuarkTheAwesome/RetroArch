@@ -50,6 +50,11 @@
 #include "../../../retroarch.h"
 #include "../../../tasks/tasks_internal.h"
 
+static void* ui_window_win32_init(void)
+{
+   return NULL;
+}
+
 static void ui_window_win32_destroy(void *data)
 {
    ui_window_win32_t *window = (ui_window_win32_t*)data;
@@ -75,11 +80,6 @@ static void ui_window_win32_set_title(void *data, char *buf)
    SetWindowText(window->hwnd, buf);
 }
 
-#ifdef __cplusplus
-extern "C"
-#endif
-   VOID (WINAPI *DragAcceptFiles_func)(HWND, BOOL);
-
 void ui_window_win32_set_droppable(void *data, bool droppable)
 {
    /* Minimum supported client: Windows XP, minimum supported server: Windows 2000 Server */
@@ -94,7 +94,8 @@ static bool ui_window_win32_focused(void *data)
    return (GetForegroundWindow() == window->hwnd);
 }
 
-const ui_window_t ui_window_win32 = {
+ui_window_t ui_window_win32 = {
+   ui_window_win32_init,
    ui_window_win32_destroy,
    ui_window_win32_set_focused,
    ui_window_win32_set_visible,

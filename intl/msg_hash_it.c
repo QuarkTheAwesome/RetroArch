@@ -25,7 +25,6 @@
 
 int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
 {
-   uint32_t driver_hash = 0;
    settings_t      *settings = config_get_ptr();
 
    switch (msg)
@@ -122,37 +121,34 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
          strlcpy(s, "Estraendo, per favore attendi...\n", len);
          break;
       case MENU_ENUM_LABEL_INPUT_DRIVER:
-         if (settings)
-            driver_hash = msg_hash_calculate(settings->arrays.input_driver);
-
-         switch (driver_hash)
          {
-            case MENU_LABEL_INPUT_DRIVER_UDEV:
-               {
-                  /* Work around C89 limitations */
-                  const char * t =
-                        "udev Input driver. \n"
-                        " \n"
-                        "Questo driver può caricare senza X. \n"
-                        " \n"
-                        "Usa la recente evdev joypad API \n"
-                        "per il supporto del joystick. Supporta \n"
-                        "hotplugging e force feedback (se \n"
-                        "supportato dal dispositivo). \n"
-                        " \n";
-                  const char * u =
-                        "Il driver legge gli eventi evdev per il supporto \n"
-                        "della tastiera. Supporta anche la callback della tastiera, \n"
-                        "mouse e touchpads. \n"
-                        " \n"
-                        "Come predefinito nella maggior parte delle distribuzioni, i nodi /dev/input \n"
-                        "sono only-root (modalità 600). Puoi settare una regola udev \n"
-                        "che fa queste accessibili ai non-root.";
-                  strlcpy(s, t, len);
-                  strlcat(s, u, len);
-               }
-               break;
-            case MENU_LABEL_INPUT_DRIVER_LINUXRAW:
+            const char *lbl = settings ? settings->arrays.input_driver : NULL;
+
+            if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_DRIVER_UDEV)))
+            {
+               /* Work around C89 limitations */
+               const char * t =
+                  "udev Input driver. \n"
+                  " \n"
+                  "Questo driver può caricare senza X. \n"
+                  " \n"
+                  "Usa la recente evdev joypad API \n"
+                  "per il supporto del joystick. Supporta \n"
+                  "hotplugging e force feedback (se \n"
+                  "supportato dal dispositivo). \n"
+                  " \n";
+               const char * u =
+                  "Il driver legge gli eventi evdev per il supporto \n"
+                  "della tastiera. Supporta anche la callback della tastiera, \n"
+                  "mouse e touchpads. \n"
+                  " \n"
+                  "Come predefinito nella maggior parte delle distribuzioni, i nodi /dev/input \n"
+                  "sono only-root (modalità 600). Puoi settare una regola udev \n"
+                  "che fa queste accessibili ai non-root.";
+               strlcpy(s, t, len);
+               strlcat(s, u, len);
+            }
+            else if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_DRIVER_LINUXRAW)))
                snprintf(s, len,
                      "linuxraw Input driver. \n"
                      " \n"
@@ -162,14 +158,12 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                      " \n"
                      "Questo driver usa la più vecchia API per il joystick \n"
                      "(/dev/input/js*).");
-               break;
-            default:
+            else
                snprintf(s, len,
                      "Driver input.\n"
                      " \n"
                      "Dipende dal driver video, potrebbe \n"
                      "forzare un differente driver input.");
-               break;
          }
          break;
       case MENU_ENUM_LABEL_LOAD_CONTENT_LIST:
@@ -209,7 +203,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
          snprintf(s, len,
                "Driver video attuale.");
 
-         if (string_is_equal_fast(settings->arrays.video_driver, "gl", 2))
+         if (string_is_equal(settings->arrays.video_driver, "gl"))
          {
             snprintf(s, len,
                   "Diver video OpenGL. \n"
@@ -223,7 +217,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "dalla tua scheda grafica \n"
                   "sottostante driver GL).");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sdl2", 4))
+         else if (string_is_equal(settings->arrays.video_driver, "sdl2"))
          {
             snprintf(s, len,
                   "Driver video SDL 2.\n"
@@ -235,7 +229,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "renderizzati via software dipende \n"
                   "dall'implementazzione sulla tua piattaforma SDL.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sdl1", 4))
+         else if (string_is_equal(settings->arrays.video_driver, "sdl1"))
          {
             snprintf(s, len,
                   "Driver video SDL.\n"
@@ -246,7 +240,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Le performance sono considerate quasi ottimali. \n"
                   "Considera di usare questo soltanto come ultima scelta.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "d3d", 3))
+         else if (string_is_equal(settings->arrays.video_driver, "d3d"))
          {
             snprintf(s, len,
                   "Driver video Direct3D. \n"
@@ -255,7 +249,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "software dipende dal driver D3D inerente \n"
                   "alla tua scheda video).");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "exynos", 6))
+         else if (string_is_equal(settings->arrays.video_driver, "exynos"))
          {
             snprintf(s, len,
                   "Exynos-G2D Video Driver. \n"
@@ -267,7 +261,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Le performance per i core renderizzati via software \n"
                   "dovrebbero essere ottimali.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sunxi", 5))
+         else if (string_is_equal(settings->arrays.video_driver, "sunxi"))
          {
             snprintf(s, len,
                   "Driver video Sunxi-G2D. \n"
@@ -284,19 +278,15 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                );
          break;
       case MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER:
-         if (settings)
-            driver_hash = msg_hash_calculate(settings->arrays.audio_resampler);
-
-         switch (driver_hash)
          {
-            case MENU_LABEL_AUDIO_RESAMPLER_DRIVER_SINC:
-               snprintf(s, len,
-                     "Implementazione SINC in modalità finestra.");
-               break;
-            case MENU_LABEL_AUDIO_RESAMPLER_DRIVER_CC:
-               snprintf(s, len,
-                     "Implementazione coseno complesso.");
-               break;
+            const char *lbl = settings ? settings->arrays.audio_resampler : NULL;
+
+            if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER_SINC)))
+               strlcpy(s,
+                     "Implementazione SINC in modalità finestra.", len);
+            else if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER_CC)))
+               strlcpy(s, 
+                     "Implementazione coseno complesso.", len);
          }
          break;
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
@@ -968,14 +958,6 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
          snprintf(s, len,
                "Saves state.");
          break;
-      case MENU_ENUM_LABEL_NETPLAY_FLIP_PLAYERS:
-         snprintf(s, len,
-               "Netplay flip users.");
-         break;
-      case MENU_ENUM_LABEL_CHEAT_INDEX_PLUS:
-         snprintf(s, len,
-               "Increment cheat index.\n");
-         break;
       case MENU_ENUM_LABEL_CHEAT_INDEX_MINUS:
          snprintf(s, len,
                "Decrement cheat index.\n");
@@ -1005,7 +987,7 @@ int menu_hash_get_help_it_enum(enum msg_hash_enums msg, char *s, size_t len)
                "Hold for fast-forward. Releasing button \n"
                "disables fast-forward.");
          break;
-      case MENU_ENUM_LABEL_SLOWMOTION:
+      case MENU_ENUM_LABEL_SLOWMOTION_HOLD:
          snprintf(s, len,
                "Hold for slowmotion.");
          break;

@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (retro_miscellaneous.h).
@@ -22,6 +22,9 @@
 
 #ifndef __RARCH_MISCELLANEOUS_H
 #define __RARCH_MISCELLANEOUS_H
+
+#define RARCH_MAX_SUBSYSTEMS 10
+#define RARCH_MAX_SUBSYSTEM_ROMS 10
 
 #include <stdint.h>
 #include <boolean.h>

@@ -42,7 +42,7 @@ static unsigned vga_video_pitch      = 0;
 static unsigned vga_video_bits       = 0;
 static bool vga_rgb32                = false;
 
-static void vga_set_mode_13h()
+static void vga_set_mode_13h(void)
 {
    __dpmi_regs r;
 
@@ -50,7 +50,7 @@ static void vga_set_mode_13h()
    __dpmi_int(0x10, &r);
 }
 
-static void vga_return_to_text_mode()
+static void vga_return_to_text_mode(void)
 {
    __dpmi_regs r;
 
@@ -58,7 +58,7 @@ static void vga_return_to_text_mode()
    __dpmi_int(0x10, &r);
 }
 
-static void vga_upload_palette()
+static void vga_upload_palette(void)
 {
    unsigned i;
    unsigned char r = 0;
@@ -90,19 +90,17 @@ static void vga_upload_palette()
    }
 }
 
-static void vga_vsync()
+static void vga_vsync(void)
 {
    /* wait until any previous retrace has ended */
    do
    {
-   }
-   while (inportb(0x3da) & 8);
+   }while (inportb(0x3da) & 8);
 
    /* wait until a new retrace has just begun */
    do
    {
-   }
-   while (!(inportb(0x3da) & 8));
+   }while (!(inportb(0x3da) & 8));
 }
 
 static void vga_gfx_create(void)
@@ -392,8 +390,10 @@ static void vga_set_osd_msg(void *data,
 }
 
 static const video_poke_interface_t vga_poke_interface = {
+   NULL, /* get_flags */
    NULL,       /* set_coords */
    NULL,       /* set_mvp */
+   NULL,
    NULL,
    NULL,
    NULL,
@@ -408,12 +408,11 @@ static const video_poke_interface_t vga_poke_interface = {
    vga_set_texture_frame,
    NULL,
    vga_set_osd_msg,
-   NULL,
-
-   NULL,
-#ifdef HAVE_MENU
-   NULL,
-#endif
+   NULL,                   /* show_mouse */
+   NULL,                   /* grab_mouse_toggle */
+   NULL,                   /* get_current_shader */
+   NULL,                   /* get_current_software_framebuffer */
+   NULL                    /* get_hw_render_interface */
 };
 
 static void vga_gfx_get_poke_interface(void *data,

@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (archive_file_sevenzip.c).
@@ -134,9 +134,6 @@ static int sevenzip_file_read(
    CSzArEx db;
    uint8_t *output      = 0;
    long outsize         = -1;
-#ifndef LEGACY_WIN32
-   wchar_t *pathW       = NULL;
-#endif
 
    /*These are the allocation routines.
     * Currently using the non-standard 7zip choices. */
@@ -148,7 +145,7 @@ static int sevenzip_file_read(
 #if defined(_WIN32) && defined(USE_WINDOWS_FILE) && !defined(LEGACY_WIN32)
    if (!string_is_empty(path))
    {
-      pathW = utf8_to_utf16_string_alloc(path);
+      wchar_t *pathW = utf8_to_utf16_string_alloc(path);
 
       if (pathW)
       {
@@ -244,9 +241,6 @@ static int sevenzip_file_read(
          {
             size_t output_size   = 0;
 
-            /*RARCH_LOG_OUTPUT("Opened archive %s. Now trying to extract %s\n",
-                  path, needle);*/
-
             /* C LZMA SDK does not support chunked extraction - see here:
              * sourceforge.net/p/sevenzip/discussion/45798/thread/6fb59aaf/
              * */
@@ -266,8 +260,6 @@ static int sevenzip_file_read(
 
                if (!filestream_write_file(optional_outfile, ptr, outsize))
                {
-                  /*RARCH_ERR("Could not open outfilepath %s.\n",
-                        optional_outfile);*/
                   res        = SZ_OK;
                   file_found = true;
                   outsize    = -1;
@@ -354,9 +346,6 @@ static int sevenzip_parse_file_init(file_archive_transfer_t *state,
 {
    struct sevenzip_context_t *sevenzip_context =
          (struct sevenzip_context_t*)sevenzip_stream_new();
-#ifndef LEGACY_WIN32
-   wchar_t *fileW = NULL;
-#endif
 
    if (state->archive_size < SEVENZIP_MAGIC_LEN)
       goto error;
@@ -369,7 +358,7 @@ static int sevenzip_parse_file_init(file_archive_transfer_t *state,
 #if defined(_WIN32) && defined(USE_WINDOWS_FILE) && !defined(LEGACY_WIN32)
    if (!string_is_empty(file))
    {
-      fileW = utf8_to_utf16_string_alloc(file);
+      wchar_t *fileW = utf8_to_utf16_string_alloc(file);
 
       if (fileW)
       {

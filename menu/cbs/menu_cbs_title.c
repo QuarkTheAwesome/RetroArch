@@ -19,6 +19,8 @@
 
 #include <compat/strl.h>
 
+#include "../../audio/audio_driver.h"
+
 #include "../menu_driver.h"
 #include "../menu_cbs.h"
 
@@ -28,26 +30,15 @@
    cbs->action_get_title_ident = #name;
 #endif
 
-static void replace_chars(char *str, char c1, char c2)
-{
-   char *pos = NULL;
-   while((pos = strchr(str, c1)))
-      *pos = c2;
-}
-
 static void sanitize_to_string(char *s, const char *label, size_t len)
 {
-   char new_label[255];
+   char *pos = NULL;
 
-   new_label[0] = '\0';
+   strlcpy(s, label, len);
 
-   if (!string_is_empty(label))
-      strlcpy(new_label, label, sizeof(new_label));
-   if (s && !string_is_empty(new_label))
-   {
-      strlcpy(s, new_label, len);
-      replace_chars(s, '_', ' ');
-   }
+   /* replace characters */
+   while((pos = strchr(s, '_')))
+      *pos = ' ';
 }
 
 static int fill_title(char *s, const char *title, const char *path, size_t len)
@@ -60,14 +51,17 @@ static int fill_title(char *s, const char *title, const char *path, size_t len)
 static int action_get_title_action_generic(const char *path, const char *label,
       unsigned menu_type, char *s, size_t len)
 {
-   sanitize_to_string(s, label, len);
+   if (s && !string_is_empty(label))
+      sanitize_to_string(s, label, len);
    return 0;
 }
 
 #define default_title_macro(func_name, lbl) \
   static int (func_name)(const char *path, const char *label, unsigned menu_type, char *s, size_t len) \
 { \
-   sanitize_to_string(s, msg_hash_to_str(lbl), len); \
+   const char *str = msg_hash_to_str(lbl); \
+   if (s && !string_is_empty(str)) \
+      sanitize_to_string(s, str, len); \
    return 0; \
 }
 
@@ -84,6 +78,15 @@ static int action_get_title_action_generic(const char *path, const char *label,
    return 0; \
 }
 
+static int action_get_title_mixer_stream_actions(const char *path, const char *label, unsigned menu_type, char *s, size_t len)
+{
+   unsigned         offset      = (menu_type - MENU_SETTINGS_AUDIO_MIXER_STREAM_ACTIONS_BEGIN);
+
+   snprintf(s, len, "Mixer Stream #%d: %s", offset + 1, audio_driver_mixer_get_stream_name(offset));
+   return 0;
+}
+
+default_title_macro(action_get_quick_menu_override_options,     MENU_ENUM_LABEL_VALUE_QUICK_MENU_OVERRIDE_OPTIONS)
 default_title_macro(action_get_user_accounts_cheevos_list,      MENU_ENUM_LABEL_VALUE_ACCOUNTS_RETRO_ACHIEVEMENTS)
 default_title_macro(action_get_download_core_content_list,      MENU_ENUM_LABEL_VALUE_DOWNLOAD_CORE_CONTENT)
 default_title_macro(action_get_user_accounts_list,              MENU_ENUM_LABEL_VALUE_ACCOUNTS_LIST)
@@ -132,7 +135,9 @@ default_title_macro(action_get_directory_settings_list,         MENU_ENUM_LABEL_
 default_title_macro(action_get_privacy_settings_list,           MENU_ENUM_LABEL_VALUE_PRIVACY_SETTINGS)
 default_title_macro(action_get_updater_settings_list,           MENU_ENUM_LABEL_VALUE_UPDATER_SETTINGS)
 default_title_macro(action_get_audio_settings_list,             MENU_ENUM_LABEL_VALUE_AUDIO_SETTINGS)
+default_title_macro(action_get_audio_mixer_settings_list,       MENU_ENUM_LABEL_VALUE_AUDIO_MIXER_SETTINGS)
 default_title_macro(action_get_input_settings_list,             MENU_ENUM_LABEL_VALUE_INPUT_SETTINGS)
+default_title_macro(action_get_latency_settings_list,           MENU_ENUM_LABEL_VALUE_LATENCY_SETTINGS)
 default_title_macro(action_get_core_cheat_options_list,         MENU_ENUM_LABEL_VALUE_CORE_CHEAT_OPTIONS)
 default_title_macro(action_get_load_content_list,               MENU_ENUM_LABEL_VALUE_LOAD_CONTENT_LIST)
 default_title_macro(action_get_load_content_special,            MENU_ENUM_LABEL_VALUE_LOAD_CONTENT_SPECIAL)
@@ -483,6 +488,16 @@ static int menu_cbs_init_bind_title_compare_label(menu_file_list_cbs_t *cbs,
       BIND_ACTION_GET_TITLE(cbs, action_get_audio_settings_list);
       return 0;
    }
+   else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_AUDIO_MIXER_SETTINGS_LIST)))
+   {
+      BIND_ACTION_GET_TITLE(cbs, action_get_audio_mixer_settings_list);
+      return 0;
+   }
+   else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_LATENCY_SETTINGS_LIST)))
+   {
+      BIND_ACTION_GET_TITLE(cbs, action_get_latency_settings_list);
+      return 0;
+   }
    else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_SYSTEM_INFORMATION)))
    {
       BIND_ACTION_GET_TITLE(cbs, action_get_system_information_list);
@@ -491,6 +506,11 @@ static int menu_cbs_init_bind_title_compare_label(menu_file_list_cbs_t *cbs,
    else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_NETWORK_INFORMATION)))
    {
       BIND_ACTION_GET_TITLE(cbs, action_get_network_information_list);
+      return 0;
+   }
+   else if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_QUICK_MENU_OVERRIDE_OPTIONS)))
+   {
+      BIND_ACTION_GET_TITLE(cbs, action_get_quick_menu_override_options);
       return 0;
    }
    else if (cbs->enum_idx != MSG_UNKNOWN)
@@ -1118,6 +1138,13 @@ int menu_cbs_init_bind_title(menu_file_list_cbs_t *cbs,
 
    if (menu_cbs_init_bind_title_compare_type(cbs, type) == 0)
       return 0;
+   
+   if (string_is_equal(label,
+            msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_MIXER_STREAM_SETTINGS_LIST)))
+   {
+      BIND_ACTION_GET_TITLE(cbs, action_get_title_mixer_stream_actions);
+      return 0;
+   }
 
    if (string_is_equal(label, msg_hash_to_str(MENU_ENUM_LABEL_DEFERRED_RPL_ENTRY_ACTIONS)))
    {

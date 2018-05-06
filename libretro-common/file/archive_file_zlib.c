@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (archive_file_zlib.c).
@@ -186,10 +186,6 @@ static int zip_file_decompressed(
    if (name[strlen(name) - 1] == '/' || name[strlen(name) - 1] == '\\')
       return 1;
 
-#if 0
-   RARCH_LOG("[deflate] Path: %s, CRC32: 0x%x\n", name, crc32);
-#endif
-
    if (strstr(name, userdata->decomp_state.needle))
    {
       bool goto_error = false;
@@ -207,9 +203,6 @@ static int zip_file_decompressed(
 
             if (buf)
             {
-               /*RARCH_LOG("%s: %s\n",
-                     msg_hash_to_str(MSG_EXTRACTING_FILE),
-                     userdata->decomp_state.opt_file);*/
                memcpy(buf, handle.data, size);
 
                if (!filestream_write_file(userdata->decomp_state.opt_file, buf, size))
@@ -247,22 +240,22 @@ static int zip_file_read(
       const char *needle, void **buf,
       const char *optional_outfile)
 {
-   file_archive_transfer_t zlib;
+   file_archive_transfer_t zlib             = {ARCHIVE_TRANSFER_NONE, 0, NULL, NULL, NULL, NULL, NULL, NULL };
    struct archive_extract_userdata userdata = {{0}};
-   bool returnerr                    = true;
-   int ret                           = 0;
+   bool returnerr                           = true;
+   int ret                                  = 0;
 
-   zlib.type                         = ARCHIVE_TRANSFER_INIT;
+   zlib.type                                = ARCHIVE_TRANSFER_INIT;
 
-   userdata.decomp_state.needle      = NULL;
-   userdata.decomp_state.opt_file    = NULL;
-   userdata.decomp_state.found       = false;
-   userdata.decomp_state.buf         = buf;
+   userdata.decomp_state.needle             = NULL;
+   userdata.decomp_state.opt_file           = NULL;
+   userdata.decomp_state.found              = false;
+   userdata.decomp_state.buf                = buf;
 
    if (needle)
-      userdata.decomp_state.needle   = strdup(needle);
+      userdata.decomp_state.needle          = strdup(needle);
    if (optional_outfile)
-      userdata.decomp_state.opt_file = strdup(optional_outfile);
+      userdata.decomp_state.opt_file        = strdup(optional_outfile);
 
    do
    {

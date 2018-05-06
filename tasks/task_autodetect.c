@@ -48,9 +48,23 @@
 #include <guiddef.h>
 #include <ks.h>
 #include <setupapi.h>
+#include <winapifamily.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <hidsdi.h>
+#ifdef __cplusplus
+}
+#endif
+
 /* Why doesn't including cguid.h work to get a GUID_NULL instead? */
+#ifdef __cplusplus
+EXTERN_C __attribute__((weak))
 const GUID GUID_NULL = {0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
+#else
+__attribute__((weak))
+const GUID GUID_NULL = {0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
+#endif
 #endif
 
 #include "../input/input_driver.h"
@@ -67,7 +81,7 @@ const GUID GUID_NULL = {0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
 /* HID Class-Specific Requests values. See section 7.2 of the HID specifications */
 #define USB_HID_GET_REPORT 0x01
 #define USB_CTRL_IN LIBUSB_ENDPOINT_IN|LIBUSB_REQUEST_TYPE_CLASS|LIBUSB_RECIPIENT_INTERFACE
-#define USB_PACKET_CTRL_LEN 64
+#define USB_PACKET_CTRL_LEN 5
 #define USB_TIMEOUT 5000 /* timeout in ms */
 
 /* only one blissbox per machine is currently supported */
@@ -233,7 +247,7 @@ static void input_autoconfigure_joypad_add(config_file_t *conf,
    input_autoconfigure_joypad_conf(conf,
          input_autoconf_binds[params->idx]);
 
-   if (string_is_equal_fast(device_type, "remote", 6))
+   if (string_is_equal(device_type, "remote"))
    {
       static bool remote_is_bound        = false;
 
@@ -259,7 +273,7 @@ static void input_autoconfigure_joypad_add(config_file_t *conf,
             ? params->name : (!string_is_empty(display_name) ? display_name : "N/A"),
             msg_hash_to_str(MSG_DEVICE_CONFIGURED_IN_PORT),
             params->idx);
-
+   
       /* allow overriding the swap menu controls for player 1*/
       if (params->idx == 0)
       {
@@ -275,6 +289,14 @@ static void input_autoconfigure_joypad_add(config_file_t *conf,
          task_set_title(task, strdup(msg));
       }
    }
+   if (!string_is_empty(display_name))
+      input_config_set_device_display_name(params->idx, display_name);
+   else
+      input_config_set_device_display_name(params->idx, params->name);
+   if (!string_is_empty(conf->path))
+      input_config_set_device_config_name(params->idx, path_basename(conf->path));
+   else
+      input_config_set_device_config_name(params->idx, "N/A");
 
 
    input_autoconfigure_joypad_reindex_devices();
@@ -901,6 +923,8 @@ bool input_autoconfigure_disconnect(unsigned i, const char *ident)
    state->msg    = strdup(msg);
 
    input_config_clear_device_name(state->idx);
+   input_config_clear_device_display_name(state->idx);
+   input_config_clear_device_config_name(state->idx);
 
    task->state   = state;
    task->handler = input_autoconfigure_disconnect_handler;

@@ -378,12 +378,15 @@ static bool gl_shader_init(gl_t *gl, const gfx_ctx_driver_t *ctx_driver,
       )
 {
    video_shader_ctx_init_t init_data;
-   settings_t *settings            = config_get_ptr();
-   const char *shader_path         = (settings->bools.video_shader_enable
-         && *settings->paths.path_shader) ? settings->paths.path_shader : NULL;
-   enum rarch_shader_type type     = video_shader_parse_type(shader_path,
+   enum rarch_shader_type type     = DEFAULT_SHADER_TYPE;
+   const char *shader_path         = retroarch_get_shader_preset();
+   
+   if (shader_path)
+   {
+      type = video_shader_parse_type(shader_path,
          gl->core_context_in_use
          ? RARCH_SHADER_GLSL : DEFAULT_SHADER_TYPE);
+   }
 
    switch (type)
    {
@@ -607,7 +610,7 @@ static INLINE void gl_set_shader_viewports(gl_t *gl)
    shader_info.idx        = 0;
    shader_info.set_active = true;
 
-   video_shader_driver_use(shader_info);
+   video_shader_driver_use(&shader_info);
 
    gl_set_viewport_wrapper(gl, width, height, false, true);
 
@@ -615,7 +618,7 @@ static INLINE void gl_set_shader_viewports(gl_t *gl)
    shader_info.idx        = 1;
    shader_info.set_active = true;
 
-   video_shader_driver_use(shader_info);
+   video_shader_driver_use(&shader_info);
    gl_set_viewport_wrapper(gl, width, height, false, true);
 }
 
@@ -744,7 +747,7 @@ static void gl_render_osd_background(
    float *verts            = (float*)malloc(2 * vertices_total * sizeof(float));
    settings_t *settings    = config_get_ptr();
    int msg_width           =
-      font_driver_get_message_width(NULL, msg, strlen(msg), 1.0f);
+      font_driver_get_message_width(NULL, msg, (unsigned)strlen(msg), 1.0f);
 
    /* shader driver expects vertex coords as 0..1 */
    float x                 = video_info->font_msg_pos_x;
@@ -826,7 +829,7 @@ static void gl_render_osd_background(
    uniform_param.result.f.v2       = colors[2];
    uniform_param.result.f.v3       = colors[3];
 
-   video_shader_driver_set_parameter(uniform_param);
+   video_shader_driver_set_parameter(&uniform_param);
 
    glDrawArrays(GL_TRIANGLES, 0, coords.vertices);
 
@@ -836,7 +839,7 @@ static void gl_render_osd_background(
    uniform_param.result.f.v2       = 0.0f;
    uniform_param.result.f.v3       = 0.0f;
 
-   video_shader_driver_set_parameter(uniform_param);
+   video_shader_driver_set_parameter(&uniform_param);
 
    free(dummy);
    free(verts);
@@ -850,7 +853,7 @@ static void gl_set_osd_msg(void *data,
       const char *msg,
       const void *params, void *font)
 {
-   font_driver_render_msg(video_info, font, msg, params);
+   font_driver_render_msg(video_info, font, msg, (const struct font_params *)params);
 }
 
 #if defined(HAVE_MENU)
@@ -1111,7 +1114,7 @@ static bool gl_frame(void *data, const void *frame,
    params.fbo_info      = NULL;
    params.fbo_info_cnt  = 0;
 
-   video_shader_driver_set_parameters(params);
+   video_shader_driver_set_parameters(&params);
 
    gl->coords.vertices  = 4;
    coords.handle_data   = NULL;
@@ -1140,6 +1143,24 @@ static bool gl_frame(void *data, const void *frame,
 
       if (gl->menu_texture)
          gl_draw_texture(gl, video_info);
+   }
+   else if (video_info->statistics_show)
+   {
+      struct font_params *osd_params = (struct font_params*)
+         &video_info->osd_stat_params;
+
+      if (osd_params)
+      {
+         font_driver_render_msg(video_info, NULL, video_info->stat_text,
+               (const struct font_params*)&video_info->osd_stat_params);
+
+#if 0
+         osd_params->y               = 0.350f;
+         osd_params->scale           = 0.75f;
+         font_driver_render_msg(video_info, NULL, video_info->chat_text,
+               (const struct font_params*)&video_info->osd_stat_params);
+#endif
+      }
    }
 #endif
 
@@ -1188,6 +1209,8 @@ static bool gl_frame(void *data, const void *frame,
 #endif
             gl_pbo_async_readback(gl);
 
+   /* emscripten has to do black frame insertion in its main loop */
+#ifndef EMSCRIPTEN
    /* Disable BFI during fast forward, slow-motion,
     * and pause to prevent flicker. */
    if (
@@ -1199,10 +1222,12 @@ static bool gl_frame(void *data, const void *frame,
       video_info->cb_swap_buffers(video_info->context_data, video_info);
       glClear(GL_COLOR_BUFFER_BIT);
    }
+#endif
 
    video_info->cb_swap_buffers(video_info->context_data, video_info);
 
-   if (video_info->hard_sync && gl->have_sync)
+   /* check if we are fast forwarding, if we are ignore hard sync */
+   if (gl->have_sync && video_info->hard_sync && !video_info->input_driver_nonblock_state)
    {
       glClear(GL_COLOR_BUFFER_BIT);
 
@@ -1345,7 +1370,6 @@ static bool resolve_extensions(gl_t *gl, const char *context_ident, const video_
     *
     * have_sync       - Use ARB_sync to reduce latency.
     */
-   gl->has_fbo                   = gl_check_capability(GL_CAPS_FBO);
    gl->have_full_npot_support    = gl_check_capability(GL_CAPS_FULL_NPOT_SUPPORT);
    gl->have_mipmap               = gl_check_capability(GL_CAPS_MIPMAP);
    gl->have_es2_compat           = gl_check_capability(GL_CAPS_ES2_COMPAT);
@@ -1660,8 +1684,36 @@ static void gl_begin_debug(gl_t *gl)
 }
 #endif
 
+extern gl_renderchain_driver_t gl2_renderchain;
 
-static void *gl_init(const video_info_t *video, const input_driver_t **input, void **input_data)
+static const gl_renderchain_driver_t *renderchain_gl_drivers[] = {
+   &gl2_renderchain,
+   NULL
+};
+
+static bool renderchain_gl_init_first(
+      const gl_renderchain_driver_t **renderchain_driver,
+      void **renderchain_handle)
+{
+   unsigned i;
+
+   for (i = 0; renderchain_gl_drivers[i]; i++)
+   {
+      void *data = renderchain_gl_drivers[i]->chain_new();
+
+      if (!data)
+         continue;
+
+      *renderchain_driver = renderchain_gl_drivers[i];
+      *renderchain_handle = data;
+      return true;
+   }
+
+   return false;
+}
+
+static void *gl_init(const video_info_t *video,
+      const input_driver_t **input, void **input_data)
 {
    gfx_ctx_mode_t mode;
    gfx_ctx_input_t inp;
@@ -1783,6 +1835,12 @@ static void *gl_init(const video_info_t *video, const input_driver_t **input, vo
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
    glBlendEquation(GL_FUNC_ADD);
 
+   gl->hw_render_use    = false;
+   gl->has_fbo          = gl_check_capability(GL_CAPS_FBO);
+
+   if (gl->has_fbo && hwr->context_type != RETRO_HW_CONTEXT_NONE)
+      gl->hw_render_use = true;
+
    if (!resolve_extensions(gl, ctx_driver->ident, video))
       goto error;
 
@@ -1820,10 +1878,6 @@ static void *gl_init(const video_info_t *video, const input_driver_t **input, vo
     * but still need multiple textures with PREV.
     */
    gl->textures         = 4;
-   gl->hw_render_use    = false;
-
-   if (gl->has_fbo && hwr->context_type != RETRO_HW_CONTEXT_NONE)
-      gl->hw_render_use = true;
 
    if (gl->hw_render_use)
    {
@@ -2530,6 +2584,14 @@ static void gl_set_coords(void *handle_data, void *shader_data,
             shader_data, coords);
 }
 
+static float gl_get_refresh_rate(void *data)
+{
+   float refresh_rate = 0.0f;
+   if (video_context_driver_get_refresh_rate(&refresh_rate))
+      return refresh_rate;
+   return 0.0f;
+}
+
 static void gl_set_mvp(void *data, void *shader_data,
       const void *mat_data)
 {
@@ -2539,12 +2601,25 @@ static void gl_set_mvp(void *data, void *shader_data,
             shader_data, mat_data);
 }
 
+static uint32_t gl_get_flags(void *data)
+{
+   uint32_t             flags = 0;
+
+   BIT32_SET(flags, GFX_CTX_FLAGS_HARD_SYNC);
+   BIT32_SET(flags, GFX_CTX_FLAGS_BLACK_FRAME_INSERTION);
+   BIT32_SET(flags, GFX_CTX_FLAGS_MENU_FRAME_FILTERING);
+
+   return flags;
+}
+
 static const video_poke_interface_t gl_poke_interface = {
+   gl_get_flags,
    gl_set_coords,
    gl_set_mvp,
    gl_load_texture,
    gl_unload_texture,
    gl_set_video_mode,
+   gl_get_refresh_rate,
    NULL,
    gl_get_video_output_size,
    gl_get_video_output_prev,
@@ -2556,16 +2631,11 @@ static const video_poke_interface_t gl_poke_interface = {
    gl_set_texture_frame,
    gl_set_texture_enable,
    gl_set_osd_msg,
-#if defined(HAVE_MENU)
    gl_show_mouse,
-#else
    NULL,
-#endif
-
-   NULL,
-#ifdef HAVE_MENU
    gl_get_current_shader,
-#endif
+   NULL,                      /* get_current_software_framebuffer */
+   NULL                       /* get_hw_render_interface */
 };
 
 static void gl_get_poke_interface(void *data,

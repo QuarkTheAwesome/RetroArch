@@ -32,17 +32,10 @@
 #include "../content.h"
 #include "../core_type.h"
 #include "../msg_hash.h"
-#include "../frontend/frontend_driver.h"
 
 RETRO_BEGIN_DECLS
 
 typedef int (*transfer_cb_t)(void *data, size_t len);
-
-typedef struct nbio_buf
-{
-   void *buf;
-   unsigned bufsize;
-} nbio_buf_t;
 
 enum content_mode_load
 {
@@ -74,6 +67,8 @@ enum nbio_type
    NBIO_TYPE_TGA,
    NBIO_TYPE_BMP,
    NBIO_TYPE_OGG,
+   NBIO_TYPE_FLAC,
+   NBIO_TYPE_MP3,
    NBIO_TYPE_MOD,
    NBIO_TYPE_WAV
 };
@@ -91,6 +86,12 @@ typedef struct nbio_handle
    msg_queue_t *msg_queue;
    transfer_cb_t  cb;
 } nbio_handle_t;
+
+typedef struct
+{
+   enum msg_hash_enums enum_idx;
+   char path[PATH_MAX_LENGTH];
+} file_transfer_t;
 
 #ifdef HAVE_NETWORKING
 typedef struct
@@ -128,7 +129,8 @@ bool task_push_dbscan(
       const char *playlist_directory,
       const char *content_database,
       const char *fullpath,
-      bool directory, retro_task_callback_t cb);
+      bool directory, bool show_hidden_files,
+      retro_task_callback_t cb);
 #endif
 
 #ifdef HAVE_OVERLAY
@@ -209,6 +211,12 @@ bool task_push_load_content_with_core_from_menu(
       enum rarch_core_type type,
       retro_task_callback_t cb,
       void *user_data);
+bool task_push_load_subsystem_with_core_from_menu(
+      const char *fullpath,
+      content_ctx_info_t *content_info,
+      enum rarch_core_type type,
+      retro_task_callback_t cb,
+      void *user_data);
 #endif
 
 void task_file_load_handler(retro_task_t *task);
@@ -251,7 +259,11 @@ void task_push_get_powerstate(void);
 
 enum frontend_powerstate get_last_powerstate(int *percent);
 
-bool task_push_audio_mixer_load(const char *fullpath, retro_task_callback_t cb, void *user_data);
+bool task_push_audio_mixer_load_and_play(
+      const char *fullpath, retro_task_callback_t cb, void *user_data);
+
+bool task_push_audio_mixer_load(
+      const char *fullpath, retro_task_callback_t cb, void *user_data);
 
 extern const char* const input_builtin_autoconfs[];
 

@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (config_file.c).
@@ -63,16 +63,6 @@ struct config_include_list
 {
    char *path;
    struct config_include_list *next;
-};
-
-struct config_file
-{
-   char *path;
-   struct config_entry_list *entries;
-   struct config_entry_list *tail;
-   unsigned include_depth;
-
-   struct config_include_list *includes;
 };
 
 static config_file_t *config_file_new_internal(
@@ -730,13 +720,13 @@ bool config_get_bool(config_file_t *conf, const char *key, bool *in)
 
    if (entry)
    {
-      if (string_is_equal_fast(entry->value, "true", 4))
+      if (string_is_equal(entry->value, "true"))
          *in = true;
-      else if (string_is_equal_fast(entry->value, "1", 1))
+      else if (string_is_equal(entry->value, "1"))
          *in = true;
-      else if (string_is_equal_fast(entry->value, "false", 5))
+      else if (string_is_equal(entry->value, "false"))
          *in = false;
-      else if (string_is_equal_fast(entry->value, "0", 1))
+      else if (string_is_equal(entry->value, "0"))
          *in = false;
       else
          return false;
@@ -872,7 +862,7 @@ bool config_file_write(config_file_t *conf, const char *path)
    if (!string_is_empty(path))
    {
       void* buf  = NULL;
-      FILE *file = fopen_utf8(path, "wb");
+      FILE *file = (FILE*)fopen_utf8(path, "wb");
       if (!file)
          return false;
 

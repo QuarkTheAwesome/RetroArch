@@ -28,7 +28,6 @@
 
 int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
 {
-   uint32_t driver_hash = 0;
    settings_t *settings = config_get_ptr();
 
    if (msg <= MENU_ENUM_LABEL_INPUT_HOTKEY_BIND_END &&
@@ -48,6 +47,10 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   " \n"
                   "Beim Loslassen wird der schnelle Vorlauf beendet."
                   );
+            break;
+         case RARCH_SLOWMOTION_HOLD_KEY:
+            snprintf(s, len,
+                  "Taste gedrückt halten, um die Zeitlupe einzuschalten.");
             break;
          case RARCH_PAUSE_TOGGLE:
             snprintf(s, len,
@@ -87,17 +90,9 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
             snprintf(s, len,
                   "Bildschirmtastatur ein-/ausschalten.");
             break;
-         case RARCH_NETPLAY_FLIP:
-            snprintf(s, len,
-                  "Netplay-Spieler tauschen.");
-            break;
          case RARCH_NETPLAY_GAME_WATCH:
                 snprintf(s, len,
                   "Im Netplay zwischen Spiel- und Beobachter-Modus wechseln.");
-            break;
-         case RARCH_SLOWMOTION:
-            snprintf(s, len,
-                  "Taste gedrückt halten, um die Zeitlupe einzuschalten.");
             break;
          case RARCH_ENABLE_HOTKEY:
             snprintf(s, len,
@@ -706,12 +701,10 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                );
          break;
       case MENU_ENUM_LABEL_INPUT_DRIVER:
-         if (settings)
-            driver_hash = msg_hash_calculate(settings->arrays.input_driver);
-
-         switch (driver_hash)
          {
-            case MENU_LABEL_INPUT_DRIVER_UDEV:
+            const char *lbl = settings ? settings->arrays.input_driver : NULL;
+
+            if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_DRIVER_UDEV)))
                snprintf(s, len,
                      "udev-Eingabetreiber. \n"
                      " \n"
@@ -729,8 +722,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                      "Regel erstellen, die auch den Zugriff für andere \n"
                      "Benutzer erlaubt."
                      );
-               break;
-            case MENU_LABEL_INPUT_DRIVER_LINUXRAW:
+            else if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_DRIVER_LINUXRAW)))
                snprintf(s, len,
                      "linuxraw-Eingabetreiber. \n"
                      " \n"
@@ -741,14 +733,12 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                      " \n"
                      "Dieser Treiber verwendet die alte Joystick-API \n"
                      "(/dev/input/js*).");
-               break;
-            default:
-               snprintf(s, len,
-                     "Eingabetreiber.\n"
-                     " \n"
-                     "Abhängig vom Grafiktreiber kann ein anderer Eingabe- \n"
-                     "treiber erzwungen werden.");
-               break;
+            else
+                  snprintf(s, len,
+                        "Eingabetreiber.\n"
+                        " \n"
+                        "Abhängig vom Grafiktreiber kann ein anderer Eingabe- \n"
+                        "treiber erzwungen werden.");
          }
          break;
       case MENU_ENUM_LABEL_LOAD_CONTENT_LIST:
@@ -787,7 +777,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
          snprintf(s, len,
                "Aktueller Grafiktreiber");
 
-         if (string_is_equal_fast(settings->arrays.video_driver, "gl", 2))
+         if (string_is_equal(settings->arrays.video_driver, "gl"))
          {
             snprintf(s, len,
                   "OpenGL-Grafiktreiber. \n"
@@ -800,7 +790,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "als auch bei Libretro-GL-Cores, hängt von dem \n"
                   "GL-Treiber deiner Grafikkarte ab.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sdl2", 4))
+         else if (string_is_equal(settings->arrays.video_driver, "sdl2"))
          {
             snprintf(s, len,
                   "SDL2-Grafiktreiber.\n"
@@ -811,7 +801,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Die Leistung hängt von der SDL- \n"
                   "Implementierung deiner Plattform ab.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sdl1", 4))
+         else if (string_is_equal(settings->arrays.video_driver, "sdl1"))
          {
             snprintf(s, len,
                   "SDL-Grafiktreiber.\n"
@@ -823,7 +813,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "solltest diesen Treiber nur als letzte \n"
                   "Möglichkeit verwenden.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "d3d", 3))
+         else if (string_is_equal(settings->arrays.video_driver, "d3d"))
          {
              snprintf(s, len,
                   "Direct3D-Grafiktreiber. \n"
@@ -832,7 +822,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Cores hängt von dem D3D-Treiber deiner \n"
                   "Grafikkarte ab.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "exynos", 6))
+         else if (string_is_equal(settings->arrays.video_driver, "exynos"))
          {
             snprintf(s, len,
                   "Exynos-G2D-Grafiktreiber. \n"
@@ -844,7 +834,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Die Leistung bei software-gerendeten Cores sollte \n"
                   "optimal sein.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "drm", 3))
+         else if (string_is_equal(settings->arrays.video_driver, "drm"))
          {
             snprintf(s, len,
                   "DRM-Grafiktreiber \n"
@@ -853,7 +843,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Er verwendet libdrm für Hardware-Skalierung und \n"
                   "GPU-Overlays.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sunxi", 5))
+         else if (string_is_equal(settings->arrays.video_driver, "sunxi"))
          {
             snprintf(s, len,
                   "Sunxi-G2D-Grafiktreiber\n"
@@ -870,23 +860,17 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                );
          break;
       case MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER:
-         if (settings)
-            driver_hash = msg_hash_calculate(settings->arrays.audio_resampler);
-
-         switch (driver_hash)
          {
-            case MENU_LABEL_AUDIO_RESAMPLER_DRIVER_SINC:
-               snprintf(s, len,
-                     "Windowed-SINC-Implementierung.");
-               break;
-            case MENU_LABEL_AUDIO_RESAMPLER_DRIVER_CC:
-               snprintf(s, len,
-                     "Convoluted-Kosinus-Implementierung.");
-               break;
-            default:
-               if (string_is_empty(s))
-                  strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE), len);
-               break;
+            const char *lbl = settings ? settings->arrays.audio_resampler : NULL;
+
+            if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER_SINC)))
+               strlcpy(s, 
+                        "Windowed-SINC-Implementierung.", len);
+            else if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER_CC)))
+               strlcpy(s,
+                     "Convoluted-Kosinus-Implementierung.", len);
+            else if (string_is_empty(s))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE), len);
          }
          break;
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
@@ -1772,11 +1756,6 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                "Der Benutzername der Person, die RetroArch verwendet. \n"
                "Wird in Online-Spielen verwendet.");
          break;
-      case MENU_ENUM_LABEL_NETPLAY_CLIENT_SWAP_INPUT:
-         snprintf(s, len,
-               "Verwendet Tastenbelegung für Spieler 1, \n"
-               "wenn du Teilnehmer an einem Netplay-Spiel bist.");
-         break;
       case MENU_ENUM_LABEL_NETPLAY_TCP_UDP_PORT:
          snprintf(s, len,
                "Der Port der Host-IP-Adresse. \n"
@@ -1892,10 +1871,6 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
          snprintf(s, len,
                "Speichert Save-State.");
          break;
-      case MENU_ENUM_LABEL_NETPLAY_FLIP_PLAYERS:
-         snprintf(s, len,
-               "Netplay-Benutzer vertauschen.");
-         break;
       case MENU_ENUM_LABEL_CHEAT_INDEX_PLUS:
          snprintf(s, len,
                "Cheat-Index erhöhen.\n");
@@ -1929,7 +1904,7 @@ int menu_hash_get_help_de_enum(enum msg_hash_enums msg, char *s, size_t len)
                "Zum Vorspulen gedrückt halten. Wird die Taste \n"
                "losgelassen, wird der schnelle Vorlauf beendet.");
          break;
-      case MENU_ENUM_LABEL_SLOWMOTION:
+      case MENU_ENUM_LABEL_SLOWMOTION_HOLD:
          snprintf(s, len,
                "Gedrückt halten für Zeitlupe.");
          break;
@@ -2078,7 +2053,7 @@ const char *msg_hash_to_str_de(enum msg_hash_enums msg)
 #ifdef HAVE_MENU
    const char *ret = menu_hash_to_str_de_label_enum(msg);
 
-   if (ret && (string_is_not_equal_fast(ret, "null", 4)))
+   if (ret && (string_is_not_equal(ret, "null")))
       return ret;
 #endif
 

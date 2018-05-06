@@ -86,6 +86,8 @@ enum file_path_enum
    FILE_PATH_ZIP_EXTENSION,
    FILE_PATH_7Z_EXTENSION,
    FILE_PATH_OGG_EXTENSION,
+   FILE_PATH_MP3_EXTENSION,
+   FILE_PATH_FLAC_EXTENSION,
    FILE_PATH_WAV_EXTENSION,
    FILE_PATH_MOD_EXTENSION,
    FILE_PATH_S3M_EXTENSION,
@@ -129,15 +131,6 @@ enum application_special_type
  */
 void fill_short_pathname_representation_wrapper(char* out_rep,
       const char *in_path, size_t size);
-
-/**
- * path_basedir:
- * @path               : path
- *
- * Extracts base directory by mutating path.
- * Keeps trailing '/'.
- **/
-void path_basedir_wrapper(char *path);
 
 const char *file_path_str(enum file_path_enum enum_idx);
 

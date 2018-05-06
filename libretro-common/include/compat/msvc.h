@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (msvc.h).
@@ -107,11 +107,6 @@ typedef int ssize_t;
       #define floorf(x) ((float)floor((double)x))
       #define sqrtf(x) ((float)sqrt((double)x))
       #define fabsf(x)    ((float)fabs((double)(x)))
-   #endif
-
-   #ifndef _vscprintf
-      #define _vscprintf c89_vscprintf_retro__
-      int c89_vscprintf_retro__(const char *format, va_list pargs);
    #endif
 
    #ifndef _strtoui64

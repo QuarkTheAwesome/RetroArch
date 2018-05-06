@@ -35,10 +35,6 @@ MSG_HASH(
       "未提供参数也没有内建菜单，显示帮助..."
       )
 MSG_HASH(
-      MSG_NETPLAY_USERS_HAS_FLIPPED,
-      "联机游戏用户已被踢出"
-      )
-MSG_HASH(
       MSG_SETTING_DISK_IN_TRAY,
       "Setting disk in tray"
       )
@@ -53,10 +49,6 @@ MSG_HASH(
 MSG_HASH(
       MSG_NETPLAY_YOU_HAVE_JOINED_AS_PLAYER_N,
       "你已作为玩家 %d 加入"
-      )
-MSG_HASH(
-      MSG_NETPLAY_IMPLEMENTATIONS_DIFFER,
-      "实现有差异。确保正在使用的RetroArch和核心是同版本的。"
       )
 MSG_HASH(
       MSG_NETPLAY_ENDIAN_DEPENDENT,
@@ -421,7 +413,7 @@ MSG_HASH(
       )
 MSG_HASH(
       MENU_ENUM_LABEL_VALUE_CHEEVOS_HARDCORE_MODE_ENABLE,
-/* FIXME? Translate 'Achievements Hardcore Mode' */
+/* FIXME? Translate 'Hardcore Mode' */
       "专家模式"
       )
 MSG_HASH(
@@ -824,8 +816,6 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_MOVIE_RECORD_TOGGLE,
       "视频录制开关")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_MUTE,
       "静音开关")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_NETPLAY_FLIP,
-      "联机游戏踢出用户")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_NETPLAY_GAME_WATCH,
       "联机游戏切换 游戏/围观 模式")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_OSK,
@@ -848,7 +838,7 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_NEXT,
       "下一个Shader")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_PREV,
       "上一个Shader")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SLOWMOTION,
+MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SLOWMOTION_HOLD_KEY,
       "慢动作")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_STATE_SLOT_MINUS,
       "存档槽 -")
@@ -932,6 +922,8 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_LANG_SPANISH,
       "西班牙语")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_LANG_VIETNAMESE,
       "越南语")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_LANG_ARABIC,
+      "Arabic")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_LEFT_ANALOG,
       "左侧摇杆")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_LIBRETRO_DIR_PATH,
@@ -1016,8 +1008,6 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY,
       "在线游戏")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_CHECK_FRAMES,
       "在线游戏检查帧数")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_CLIENT_SWAP_INPUT,
-      "在线玩家P2使用C1")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_DELAY_FRAMES,
       "在线游戏延迟帧数")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_DISCONNECT,
@@ -1636,6 +1626,8 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_REFRESH_RATE,
       "刷新率")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_REFRESH_RATE_AUTO,
       "估算的显示器帧率")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_REFRESH_RATE_POLLED,
+      "Set Display-Reported Refresh Rate")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
       "旋转")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_SCALE,
@@ -1766,6 +1758,8 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_SETTINGS,
       "显示设置页")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_VIDEO,
       "显示视频页")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_XMB_LAYOUT,
+      "Menu Layout")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_XMB_THEME,
       "菜单图标主题")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_YES,
@@ -1867,6 +1861,8 @@ MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_MONITOR_INDEX,
       "选择将要使用哪一个显示器。")
 MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_REFRESH_RATE_AUTO,
       "估算的显示器刷新率(Hz)。")
+MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_REFRESH_RATE_POLLED,
+      "The refresh rate as reported by the display driver.")
 MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_SETTINGS,
       "调整视频输出的选项。")
 MSG_HASH(MENU_ENUM_SUBLABEL_WIFI_SETTINGS,
@@ -2417,7 +2413,7 @@ MSG_HASH(MSG_NETPLAY_LAN_SCANNING,
 MSG_HASH(MENU_ENUM_SUBLABEL_PAUSE_NONACTIVE,
       "当窗口失去焦点时暂停游戏。")
 MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_DISABLE_COMPOSITION,
-      "Enable or disable composition (Windows only).")
+      "Enable or disable composition.")
 MSG_HASH(MENU_ENUM_SUBLABEL_HISTORY_LIST_ENABLE,
       "为游戏、图片、音乐和视频启用/禁用历史记录。")
 MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_HISTORY_SIZE,
@@ -2775,8 +2771,6 @@ MSG_HASH(MENU_ENUM_SUBLABEL_SORT_SAVEFILES_ENABLE,
 MSG_HASH(MENU_ENUM_SUBLABEL_SORT_SAVESTATES_ENABLE,
       "Sort save states in folders named after the core used."
       )
-MSG_HASH(MENU_ENUM_SUBLABEL_NETPLAY_CLIENT_SWAP_INPUT,
-      "When being client over netplay, use keybinds for Player 1.")
 MSG_HASH(MENU_ENUM_SUBLABEL_CORE_UPDATER_BUILDBOT_URL,
       "URL to core updater directory on the Libretro buildbot.")
 MSG_HASH(MENU_ENUM_SUBLABEL_BUILDBOT_ASSETS_URL,
@@ -2889,6 +2883,8 @@ MSG_HASH(MENU_ENUM_SUBLABEL_DISK_IMAGE_APPEND,
       "Select a disk image to insert.")
 MSG_HASH(MENU_ENUM_SUBLABEL_MENU_ENUM_THROTTLE_FRAMERATE,
       "Makes sure the framerate is capped while inside the menu.")
+MSG_HASH(MENU_ENUM_SUBLABEL_XMB_LAYOUT,
+      "Select a different layout for the XMB interface.")
 MSG_HASH(MENU_ENUM_SUBLABEL_XMB_THEME,
       "Select a different theme for the icon. Changes will take effect after you restart the program.")
 MSG_HASH(MENU_ENUM_SUBLABEL_XMB_SHADOWS_ENABLE,
@@ -2917,6 +2913,8 @@ MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_HISTORY,
       "Show the recent history tab inside the main menu.")
 MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_ADD,
       "Show the import content tab inside the main menu.")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_PLAYLISTS,
+      "Show playlist tabs inside the main menu.")
 MSG_HASH(MENU_ENUM_SUBLABEL_RGUI_SHOW_START_SCREEN,
       "Show startup screen in menu. This is automatically set to false after the program starts for the first time.")
 MSG_HASH(MENU_ENUM_SUBLABEL_MATERIALUI_MENU_HEADER_OPACITY,
@@ -3033,8 +3031,12 @@ MSG_HASH(MENU_ENUM_SUBLABEL_NETPLAY_USE_MITM_SERVER,
       "Forward netplay connections through a man-in-the-middle server. Useful if the host is behind a firewall or has NAT/UPnP problems.")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER,
       "Add to mixer")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER_AND_PLAY,
+      "Add to mixer and play")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER_AND_COLLECTION,
       "Add to mixer")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER_AND_COLLECTION_AND_PLAY,
+      "Add to mixer and play")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_FILTER_BY_CURRENT_CORE,
       "Filter by current core")
 MSG_HASH(
@@ -3219,3 +3221,69 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_QUALITY,
       "Audio Resampler Quality")
 MSG_HASH(MENU_ENUM_SUBLABEL_AUDIO_RESAMPLER_QUALITY,
       "Lower this value to favor performance/lower latency over audio quality, increase if you want better audio quality at the expense of performance/lower latency.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_STATISTICS_SHOW,
+      "Display Statistics")
+MSG_HASH(MENU_ENUM_SUBLABEL_STATISTICS_SHOW,
+      "Show onscreen technical statistics.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MENU_RGUI_BORDER_FILLER_ENABLE,
+      "Enable border filler")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MENU_RGUI_BORDER_FILLER_THICKNESS_ENABLE,
+      "Enable border filler thickness")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MENU_RGUI_BACKGROUND_FILLER_THICKNESS_ENABLE,
+      "Enable background filler thickness")
+MSG_HASH(MENU_ENUM_SUBLABEL_CRT_SWITCH_RESOLUTION, "For 15 kHz CRT displays only. Attempts to use exact core/game resolution and refresh rate.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CRT_SWITCH_RESOLUTION, "CRT SwitchRes") 
+MSG_HASH(MENU_ENUM_SUBLABEL_CRT_SWITCH_RESOLUTION_SUPER, "When CRT SwitchRes is enabled, force ultrawide horizontal resolution to minimize mode switching.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CRT_SWITCH_RESOLUTION_SUPER, "CRT Super Resolution") 
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_REWIND,
+      "Show Rewind Settings")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_REWIND,
+      "Show/hide the Rewind options.")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_LATENCY,
+      "Show/hide the Latency options.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_LATENCY,
+      "Show Latency Settings")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_OVERLAYS,
+      "Show/hide the Overlay options.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_OVERLAYS,
+      "Show Overlay Settings")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_AUDIO_ENABLE_MENU,
+      "Enable menu audio")
+MSG_HASH(MENU_ENUM_SUBLABEL_AUDIO_ENABLE_MENU,
+      "Enable or disable menu sound.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_AUDIO_MIXER_SETTINGS,
+      "Mixer Settings")
+MSG_HASH(MENU_ENUM_SUBLABEL_AUDIO_MIXER_SETTINGS,
+      "View and/or modify audio mixer settings.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_QUICK_MENU_OVERRIDE_OPTIONS,
+      "Configuration Override options")
+MSG_HASH(MENU_ENUM_SUBLABEL_QUICK_MENU_OVERRIDE_OPTIONS,
+      "Options for overriding the global configuration.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_PLAY,
+      "Will start playback of the audio stream. Once finished, it will remove the current audio stream from memory.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_PLAY_LOOPED,
+      "Will start playback of the audio stream. Once finished, it will loop and play the track again from the beginning.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_PLAY_SEQUENTIAL,
+      "Will start playback of the audio stream. Once finished, it will jump to the next audio stream in sequential order and repeat this behavior. Useful as an album playback mode.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_STOP,
+      "This will stop playback of the audio stream, but not remove it from memory. You can start playing it again by selecting 'Play'.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_REMOVE,
+      "This will stop playback of the audio stream and remove it entirely from memory.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_VOLUME,
+      "Adjust the volume of the audio stream.")
+MSG_HASH(MENU_ENUM_SUBLABEL_ADD_TO_MIXER,
+      "Add this audio track to an available audio stream slot. If no slots are currently available, it will be ignored.")
+MSG_HASH(MENU_ENUM_SUBLABEL_ADD_TO_MIXER_AND_PLAY,
+      "Add this audio track to an available audio stream slot and play it. If no slots are currently available, it will be ignored.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_PLAY,
+      "Play")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_PLAY_LOOPED,
+      "Play (Looped)")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_PLAY_SEQUENTIAL,
+      "Play (Sequential)")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_STOP,
+      "Stop")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_REMOVE,
+      "Remove")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_VOLUME,
+      "Volume")

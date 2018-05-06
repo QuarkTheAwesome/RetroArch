@@ -1,7 +1,8 @@
 MAKEFILE_DEFINES=''
 CONFIG_DEFINES=''
 
-[ "$PREFIX" ] || PREFIX="/usr/local"
+PREFIX="${PREFIX:-/usr/local}"
+SHARE_DIR="${SHARE_DIR:-${PREFIX}/share}"
 
 add_define() # $1 = MAKEFILE or CONFIG $2 = define $3 = value
 { eval "${1}_DEFINES=\"\${${1}_DEFINES} $2=$3\""; }
@@ -25,6 +26,18 @@ check_compiler() # $1 = language  $2 = function in lib
 		TEMP_CODE="$TEMP_C"
 		TEST_C="void $2(void); int main(void) { $2(); return 0; }"
 	fi
+}
+
+check_enabled() # $1 = HAVE_$1  $2 = lib
+{	[ "$HAVE_CXX" != 'no' ] && return 0
+	tmpval="$(eval "printf %s \"\$HAVE_$1\"")"
+
+	if [ "$tmpval" != 'yes' ]; then
+		eval "HAVE_$1=no"
+		return 0
+	fi
+
+	die 1 "Forced to build with $2 support and the C++ compiler is disabled. Exiting ..."
 }
 
 check_lib() # $1 = language  $2 = HAVE_$2  $3 = lib  $4 = function in lib  $5 = extralibs $6 = headers $7 = critical error message [checked only if non-empty]
@@ -221,10 +234,11 @@ create_config_make()
 
 	printf %s\\n "Creating make config: $outfile"
 
-	{	[ "$USE_LANG_C" = 'yes' ] && printf %s\\n "CC = $CC" "CFLAGS = $CFLAGS"
-		[ "$USE_LANG_CXX" = 'yes' ] && printf %s\\n "CXX = $CXX" "CXXFLAGS = $CXXFLAGS"
+	{	[ "$HAVE_CC" = 'yes' ] && printf %s\\n "CC = $CC" "CFLAGS = $CFLAGS"
+		[ "$HAVE_CXX" = 'yes' ] && printf %s\\n "CXX = $CXX" "CXXFLAGS = $CXXFLAGS"
 
 		printf %s\\n "WINDRES = $WINDRES" \
+			"MOC = $MOC" \
 			"ASFLAGS = $ASFLAGS" \
 			"LDFLAGS = $LDFLAGS" \
 			"INCLUDE_DIRS = $INCLUDE_DIRS" \

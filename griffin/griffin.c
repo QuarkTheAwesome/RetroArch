@@ -14,14 +14,11 @@
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define CINTERFACE
 #define HAVE_IBXM 1
 
-#if defined(HAVE_CG) || defined(HAVE_HLSL) || defined(HAVE_GLSL)
-#define HAVE_SHADERS
-#endif
-
 #if defined(HAVE_ZLIB) || defined(HAVE_7ZIP)
-#define HAVE_COMPRESSION
+#define HAVE_COMPRESSION 1
 #endif
 
 #if _MSC_VER
@@ -324,14 +321,15 @@ VIDEO DRIVER
 ============================================================ */
 #if defined(HAVE_D3D)
 #include "../gfx/common/d3d_common.c"
-#include "../gfx/drivers/d3d.c"
-#include "../gfx/drivers_context/d3d_ctx.c"
 
 #if defined(HAVE_D3D8)
-#include "../gfx/drivers_renderchain/d3d8_renderchain.c"
+#include "../gfx/drivers/d3d8.c"
+#include "../gfx/common/d3d8_common.c"
 #endif
 
 #if defined(HAVE_D3D9)
+#include "../gfx/drivers/d3d9.c"
+#include "../gfx/common/d3d9_common.c"
 
 #ifdef HAVE_HLSL
 #include "../gfx/drivers_renderchain/d3d9_hlsl_renderchain.c"
@@ -345,11 +343,35 @@ VIDEO DRIVER
 
 #endif
 
+#if defined(HAVE_D3D11)
+#include "../gfx/drivers/d3d11.c"
+#include "../gfx/common/d3d11_common.c"
+#endif
+
+#if defined(HAVE_D3D12)
+#include "../gfx/drivers/d3d12.c"
+#include "../gfx/common/d3d12_common.c"
+#endif
+
+#if defined(HAVE_D3D10)
+#include "../gfx/drivers/d3d10.c"
+#include "../gfx/common/d3d10_common.c"
+#endif
+
+#if defined(HAVE_D3D10) || defined(HAVE_D3D11) || defined(HAVE_D3D12)
+#include "../gfx/common/d3dcompiler_common.c"
+#include "../gfx/common/dxgi_common.c"
+#endif
+
 #if defined(GEKKO)
 #ifdef HW_RVL
 #include "../gfx/drivers/gx_gfx_vi_encoder.c"
 #include "../memory/wii/mem2_manager.c"
 #endif
+#endif
+
+#if defined(__wiiu__)
+#include "../gfx/drivers/gx2_gfx.c"
 #endif
 
 #ifdef HAVE_SDL2
@@ -372,7 +394,6 @@ VIDEO DRIVER
 #include "../gfx/drivers/drm_gfx.c"
 #endif
 
-#include "../gfx/drivers_renderchain/null_renderchain.c"
 #include "../gfx/display_servers/dispserv_null.c"
 
 #ifdef HAVE_OPENGL
@@ -488,6 +509,18 @@ FONTS
 #include "../gfx/drivers_font/vulkan_raster_font.c"
 #endif
 
+#if defined(HAVE_D3D10)
+#include "../gfx/drivers_font/d3d10_font.c"
+#endif
+
+#if defined(HAVE_D3D11)
+#include "../gfx/drivers_font/d3d11_font.c"
+#endif
+
+#if defined(HAVE_D3D12)
+#include "../gfx/drivers_font/d3d12_font.c"
+#endif
+
 /*============================================================
 INPUT
 ============================================================ */
@@ -498,6 +531,7 @@ INPUT
 
 #ifdef HAVE_OVERLAY
 #include "../input/input_overlay.c"
+#include "../led/drivers/led_overlay.c"
 #include "../tasks/task_overlay.c"
 #endif
 
@@ -526,6 +560,9 @@ INPUT
 #elif defined(GEKKO)
 #include "../input/drivers/gx_input.c"
 #include "../input/drivers_joypad/gx_joypad.c"
+#elif defined(__wiiu__)
+#include "../input/drivers/wiiu_input.c"
+#include "../input/drivers_joypad/wiiu_joypad.c"
 #elif defined(_XBOX)
 #include "../input/drivers/xdk_xinput_input.c"
 #include "../input/drivers_joypad/xdk_joypad.c"
@@ -540,6 +577,7 @@ INPUT
 #include "../input/drivers_joypad/qnx_joypad.c"
 #elif defined(EMSCRIPTEN)
 #include "../input/drivers/rwebinput_input.c"
+#include "../input/drivers_joypad/rwebpad_joypad.c"
 #elif defined(DJGPP)
 #include "../input/drivers/dos_input.c"
 #include "../input/drivers_joypad/dos_joypad.c"
@@ -673,10 +711,10 @@ LEDS
 
 #include "../led/led_driver.c"
 
-#include "../led/null_led_driver.c"
+#include "../led/drivers/led_null.c"
 
 #if defined(HAVE_RPILED)
-#include "../led/rpi_led_driver.c"
+#include "../led/drivers/led_rpi.c"
 #endif
 
 /*============================================================
@@ -705,6 +743,8 @@ AUDIO
 #include "../audio/drivers/xenon360_audio.c"
 #elif defined(GEKKO)
 #include "../audio/drivers/gx_audio.c"
+#elif defined(__wiiu__)
+#include "../audio/drivers/wiiu_audio.c"
 #elif defined(EMSCRIPTEN)
 #include "../audio/drivers/rwebaudio.c"
 #elif defined(PSP) || defined(VITA)
@@ -761,6 +801,7 @@ AUDIO
 DRIVERS
 ============================================================ */
 #include "../gfx/video_driver.c"
+#include "../gfx/video_crt_switch.c"
 #include "../gfx/video_display_server.c"
 #include "../gfx/video_coord_array.c"
 #include "../input/input_driver.c"
@@ -881,6 +922,8 @@ FRONTEND
 #ifdef HW_RVL
 #include "../frontend/drivers/platform_wii.c"
 #endif
+#elif defined(__wiiu__)
+#include "../frontend/drivers/platform_wiiu.c"
 #elif defined(PSP) || defined(VITA)
 #include "../frontend/drivers/platform_psp.c"
 #elif defined(_3DS)
@@ -957,6 +1000,7 @@ RETROARCH
 #include "../intl/msg_hash_vn.c"
 #include "../intl/msg_hash_chs.c"
 #include "../intl/msg_hash_cht.c"
+#include "../intl/msg_hash_ar.c"
 #endif
 
 #include "../intl/msg_hash_us.c"
@@ -1022,12 +1066,13 @@ THREAD
 NETPLAY
 ============================================================ */
 #ifdef HAVE_NETWORKING
-#define JSON_STATIC /* must come before netplay_room_parse and jsonsax_full */
+#define JSON_STATIC 1 /* must come before netplay_room_parse and jsonsax_full */
 #include "../network/netplay/netplay_delta.c"
 #include "../network/netplay/netplay_frontend.c"
 #include "../network/netplay/netplay_handshake.c"
 #include "../network/netplay/netplay_init.c"
 #include "../network/netplay/netplay_io.c"
+#include "../network/netplay/netplay_keyboard.c"
 #include "../network/netplay/netplay_sync.c"
 #include "../network/netplay/netplay_discovery.c"
 #include "../network/netplay/netplay_buf.c"
@@ -1037,7 +1082,7 @@ NETPLAY
 #include "../libretro-common/net/net_http.c"
 #include "../libretro-common/net/net_natt.c"
 #include "../libretro-common/formats/json/jsonsax_full.c"
-#ifndef HAVE_SOCKET_LEGACY
+#if !defined(HAVE_SOCKET_LEGACY) && !defined(__wiiu__)
 #include "../libretro-common/net/net_ifinfo.c"
 #endif
 #include "../tasks/task_http.c"
@@ -1092,7 +1137,6 @@ MENU
 #include "../menu/widgets/menu_dialog.c"
 #include "../menu/widgets/menu_input_dialog.c"
 #include "../menu/widgets/menu_input_bind_dialog.c"
-#include "../menu/widgets/menu_list.c"
 #include "../menu/widgets/menu_osk.c"
 #include "../menu/cbs/menu_cbs_ok.c"
 #include "../menu/cbs/menu_cbs_cancel.c"
@@ -1120,8 +1164,24 @@ MENU
 
 #include "../menu/drivers_display/menu_display_null.c"
 
-#if defined(HAVE_D3D)
-#include "../menu/drivers_display/menu_display_d3d.c"
+#if defined(HAVE_D3D8)
+#include "../menu/drivers_display/menu_display_d3d8.c"
+#endif
+
+#if defined(HAVE_D3D9)
+#include "../menu/drivers_display/menu_display_d3d9.c"
+#endif
+
+#if defined(HAVE_D3D10)
+#include "../menu/drivers_display/menu_display_d3d10.c"
+#endif
+
+#if defined(HAVE_D3D11)
+#include "../menu/drivers_display/menu_display_d3d11.c"
+#endif
+
+#if defined(HAVE_D3D12)
+#include "../menu/drivers_display/menu_display_d3d12.c"
 #endif
 
 #ifdef HAVE_OPENGL
@@ -1163,7 +1223,7 @@ MENU
 #include "../menu/drivers/rgui.c"
 #endif
 
-#if defined(HAVE_OPENGL) || defined(HAVE_VITA2D) || defined(_3DS) || defined(_MSC_VER)
+#if defined(HAVE_OPENGL) || defined(HAVE_VITA2D) || defined(_3DS) || defined(_MSC_VER) || defined(__wiiu__)
 #ifdef HAVE_XMB
 #include "../menu/drivers/xmb.c"
 #endif
@@ -1190,14 +1250,21 @@ MENU
 #include "../cores/libretro-net-retropad/net_retropad_core.c"
 #endif
 
-#ifdef HAVE_KEYMAPPER
 #include "../input/input_mapper.c"
-#endif
 
 #include "../command.c"
 
 #if defined(HAVE_NETWORKING)
 #include "../libretro-common/net/net_http_parse.c"
+#endif
+
+#ifdef HAVE_RUNAHEAD
+#include "../runahead/mem_util.c"
+#include "../runahead/secondary_core.c"
+#include "../runahead/run_ahead.c"
+#include "../runahead/copy_load_info.c"
+#include "../runahead/dirty_input.c"
+#include "../runahead/mylist.c"
 #endif
 
 /*============================================================
@@ -1206,7 +1273,7 @@ DEPENDENCIES
 #ifdef WANT_ZLIB
 #include "../deps/libz/adler32.c"
 #include "../deps/libz/compress.c"
-#include "../deps/libz/crc32.c"
+#include "../deps/libz/libz-crc32.c"
 #include "../deps/libz/deflate.c"
 #include "../deps/libz/gzclose.c"
 #include "../deps/libz/gzlib.c"
@@ -1239,11 +1306,24 @@ DEPENDENCIES
 #endif
 
 #ifdef HAVE_CHD
-#include "../libretro-common/formats/libchdr/bitstream.c"
-#include "../libretro-common/formats/libchdr/cdrom.c"
-#include "../libretro-common/formats/libchdr/chd.c"
-#include "../libretro-common/formats/libchdr/flac.c"
-#include "../libretro-common/formats/libchdr/huffman.c"
+#include "../libretro-common/formats/libchdr/libchdr_bitstream.c"
+#include "../libretro-common/formats/libchdr/libchdr_cdrom.c"
+#include "../libretro-common/formats/libchdr/libchdr_chd.c"
+
+#ifdef HAVE_FLAC
+#include "../libretro-common/formats/libchdr/libchdr_flac.c"
+#include "../libretro-common/formats/libchdr/libchdr_flac_codec.c"
+#endif
+
+#ifdef HAVE_ZLIB
+#include "../libretro-common/formats/libchdr/libchdr_zlib.c"
+#endif
+
+#ifdef HAVE_7ZIP
+#include "../libretro-common/formats/libchdr/libchdr_lzma.c"
+#endif
+
+#include "../libretro-common/formats/libchdr/libchdr_huffman.c"
 
 #include "../libretro-common/streams/chd_stream.c"
 #endif
@@ -1270,7 +1350,7 @@ XML
 ============================================================ */
 #if 0
 #ifndef HAVE_LIBXML2
-#define RXML_LIBXML2_COMPAT
+#define RXML_LIBXML2_COMPAT 1
 #include "../libretro-common/formats/xml/rxml.c"
 #endif
 #endif
@@ -1309,7 +1389,6 @@ XML
 #include "../deps/miniupnpc/minixml.c"
 #include "../deps/miniupnpc/minisoap.c"
 #endif
-
 
 /*============================================================
 HTTP SERVER

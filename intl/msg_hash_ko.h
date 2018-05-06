@@ -35,10 +35,6 @@ MSG_HASH(
       "제공되는 인수 및 메뉴, 도움말이 없습니다..."
       )
 MSG_HASH(
-      MSG_NETPLAY_USERS_HAS_FLIPPED,
-      "넷플레이 사용자가 변경되었습니다"
-      )
-MSG_HASH(
       MSG_SETTING_DISK_IN_TRAY,
       "디스크 트레이 설정"
       )
@@ -52,11 +48,7 @@ MSG_HASH(
       )
 MSG_HASH(
       MSG_NETPLAY_YOU_HAVE_JOINED_AS_PLAYER_N,
-      "Y%d 플레이어로 입장했습니다"
-      )
-MSG_HASH(
-      MSG_NETPLAY_IMPLEMENTATIONS_DIFFER,
-      "구현 방법에 차이가 있습니다. 동일한 버전의 RetroArch와 코어인지 확인하십시오."
+      "Y%u 플레이어로 입장했습니다"
       )
 MSG_HASH(
       MSG_NETPLAY_ENDIAN_DEPENDENT,
@@ -811,8 +803,6 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_MOVIE_RECORD_TOGGLE,
       "동영상 기록 시작/중지")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_MUTE,
       "음소거 켜기/끄기")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_NETPLAY_FLIP,
-      "넷플레이 사용자 전환")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_NETPLAY_GAME_WATCH,
       "넷플레이 플레이/관전 전환")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_OSK,
@@ -835,7 +825,7 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_NEXT,
       "다음 쉐이더")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SHADER_PREV,
       "이전 쉐이더")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SLOWMOTION,
+MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_SLOWMOTION_HOLD_KEY,
       "슬로우 모션")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_INPUT_META_STATE_SLOT_MINUS,
       "상태저장 슬롯 -")
@@ -917,6 +907,8 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_LANG_SPANISH,
       "스페인어")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_LANG_VIETNAMESE,
       "베트남어")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_LANG_ARABIC,
+      "Arabic")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_LEFT_ANALOG,
       "좌 아날로그")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_LIBRETRO_DIR_PATH,
@@ -1007,8 +999,6 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_INPUT_LATENCY_FRAMES_MIN,
       "입력 대기 프레임")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_INPUT_LATENCY_FRAMES_RANGE,
       "입력 대기 프레임 범위")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_CLIENT_SWAP_INPUT,
-      "넷플레이 P2 사용 C1")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_DELAY_FRAMES,
       "넷플레이 지연 프레임")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_NETPLAY_DISCONNECT,
@@ -1631,6 +1621,8 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_POST_FILTER_RECORD,
       "필터 적용된 녹화 사용")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_REFRESH_RATE,
       "수직 리프레시 비율")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_REFRESH_RATE_POLLED,
+      "Set Display-Reported Refresh Rate")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_REFRESH_RATE_AUTO,
       "화면 프레임레이트 측정치")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_ROTATION,
@@ -1649,8 +1641,6 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PARAMETERS,
       "쉐이더 매개변수 미리보기")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PRESET,
       "쉐이더 프리셋 불러오기")
-MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PRESET_PARAMETERS,
-      "메뉴 쉐이더 매개변수")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PRESET_SAVE_AS,
       "쉐이더 프리셋 다른 이름으로 저장")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_VIDEO_SHADER_PRESET_SAVE_CORE,
@@ -1765,6 +1755,8 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_VIDEO,
       "비디오 탭 보이기")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_NETPLAY,
       "넷플레이 탭 보이기")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_XMB_LAYOUT,
+      "Menu Layout")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_XMB_THEME,
       "메뉴 아이콘 테마")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_YES,
@@ -1865,6 +1857,8 @@ MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_MONITOR_INDEX,
       "사용할 디스플레이를 선택.")
 MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_REFRESH_RATE_AUTO,
       "화면의 정확한 리프레시 비율(Hz) 측정치.")
+MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_REFRESH_RATE_POLLED,
+      "The refresh rate as reported by the display driver.")
 MSG_HASH(MENU_ENUM_SUBLABEL_VIDEO_SETTINGS,
       "비디오 출력 설정 변경.")
 MSG_HASH(MENU_ENUM_SUBLABEL_WIFI_SETTINGS,
@@ -2771,8 +2765,6 @@ MSG_HASH(MENU_ENUM_SUBLABEL_SORT_SAVEFILES_ENABLE,
 MSG_HASH(MENU_ENUM_SUBLABEL_SORT_SAVESTATES_ENABLE,
       "코어 이름 폴더별로 저장된 상태저장파일 정렬."
       )
-MSG_HASH(MENU_ENUM_SUBLABEL_NETPLAY_CLIENT_SWAP_INPUT,
-      "클라이어트로 넷플레이 접속시 사용자 1 키설정 사용.")
 MSG_HASH(MENU_ENUM_SUBLABEL_CORE_UPDATER_BUILDBOT_URL,
       "Libretro 빌드봇 상의 코어 업데이터 디렉토리 URL.")
 MSG_HASH(MENU_ENUM_SUBLABEL_BUILDBOT_ASSETS_URL,
@@ -2885,6 +2877,8 @@ MSG_HASH(MENU_ENUM_SUBLABEL_DISK_IMAGE_APPEND,
       "삽입할 디스크 이미지를 선택하십시오.")
 MSG_HASH(MENU_ENUM_SUBLABEL_MENU_ENUM_THROTTLE_FRAMERATE,
       "메뉴상에 있을 시에는 프레임 제한을 설정.")
+MSG_HASH(MENU_ENUM_SUBLABEL_XMB_LAYOUT,
+      "Select a different layout for the XMB interface.")
 MSG_HASH(MENU_ENUM_SUBLABEL_XMB_THEME,
       "다른 아이콘 테마 선택. 변경 내용은 프로그램을 다시 시작 후 적용됩니다.")
 MSG_HASH(MENU_ENUM_SUBLABEL_XMB_SHADOWS_ENABLE,
@@ -3028,8 +3022,12 @@ MSG_HASH(MENU_ENUM_SUBLABEL_NETPLAY_USE_MITM_SERVER,
       "Forward netplay connections through a man-in-the-middle server. Useful if the host is behind a firewall or has NAT/UPnP problems.")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER,
       "Add to mixer")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER_AND_PLAY,
+      "Add to mixer and play")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER_AND_COLLECTION,
       "Add to mixer")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_ADD_TO_MIXER_AND_COLLECTION_AND_PLAY,
+      "Add to mixer and play")
 MSG_HASH(MENU_ENUM_LABEL_VALUE_FILTER_BY_CURRENT_CORE,
       "Filter by current core")
 MSG_HASH(
@@ -3214,3 +3212,69 @@ MSG_HASH(MENU_ENUM_LABEL_VALUE_AUDIO_RESAMPLER_QUALITY,
       "Audio Resampler Quality")
 MSG_HASH(MENU_ENUM_SUBLABEL_AUDIO_RESAMPLER_QUALITY,
       "Lower this value to favor performance/lower latency over audio quality, increase if you want better audio quality at the expense of performance/lower latency.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_STATISTICS_SHOW,
+      "Display Statistics")
+MSG_HASH(MENU_ENUM_SUBLABEL_STATISTICS_SHOW,
+      "Show onscreen technical statistics.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MENU_RGUI_BORDER_FILLER_ENABLE,
+      "Enable border filler")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MENU_RGUI_BORDER_FILLER_THICKNESS_ENABLE,
+      "Enable border filler thickness")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MENU_RGUI_BACKGROUND_FILLER_THICKNESS_ENABLE,
+      "Enable background filler thickness")
+MSG_HASH(MENU_ENUM_SUBLABEL_CRT_SWITCH_RESOLUTION, "For 15 kHz CRT displays only. Attempts to use exact core/game resolution and refresh rate.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CRT_SWITCH_RESOLUTION, "CRT SwitchRes") 
+MSG_HASH(MENU_ENUM_SUBLABEL_CRT_SWITCH_RESOLUTION_SUPER, "When CRT SwitchRes is enabled, force ultrawide horizontal resolution to minimize mode switching.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CRT_SWITCH_RESOLUTION_SUPER, "CRT Super Resolution") 
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_REWIND,
+      "Show Rewind Settings")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_REWIND,
+      "Show/hide the Rewind options.")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_LATENCY,
+      "Show/hide the Latency options.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_LATENCY,
+      "Show Latency Settings")
+MSG_HASH(MENU_ENUM_SUBLABEL_CONTENT_SHOW_OVERLAYS,
+      "Show/hide the Overlay options.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_CONTENT_SHOW_OVERLAYS,
+      "Show Overlay Settings")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_AUDIO_ENABLE_MENU,
+      "Enable menu audio")
+MSG_HASH(MENU_ENUM_SUBLABEL_AUDIO_ENABLE_MENU,
+      "Enable or disable menu sound.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_AUDIO_MIXER_SETTINGS,
+      "Mixer Settings")
+MSG_HASH(MENU_ENUM_SUBLABEL_AUDIO_MIXER_SETTINGS,
+      "View and/or modify audio mixer settings.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_QUICK_MENU_OVERRIDE_OPTIONS,
+      "Configuration Override options")
+MSG_HASH(MENU_ENUM_SUBLABEL_QUICK_MENU_OVERRIDE_OPTIONS,
+      "Options for overriding the global configuration.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_PLAY,
+      "Will start playback of the audio stream. Once finished, it will remove the current audio stream from memory.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_PLAY_LOOPED,
+      "Will start playback of the audio stream. Once finished, it will loop and play the track again from the beginning.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_PLAY_SEQUENTIAL,
+      "Will start playback of the audio stream. Once finished, it will jump to the next audio stream in sequential order and repeat this behavior. Useful as an album playback mode.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_STOP,
+      "This will stop playback of the audio stream, but not remove it from memory. You can start playing it again by selecting 'Play'.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_REMOVE,
+      "This will stop playback of the audio stream and remove it entirely from memory.")
+MSG_HASH(MENU_ENUM_SUBLABEL_MIXER_ACTION_VOLUME,
+      "Adjust the volume of the audio stream.")
+MSG_HASH(MENU_ENUM_SUBLABEL_ADD_TO_MIXER,
+      "Add this audio track to an available audio stream slot. If no slots are currently available, it will be ignored.")
+MSG_HASH(MENU_ENUM_SUBLABEL_ADD_TO_MIXER_AND_PLAY,
+      "Add this audio track to an available audio stream slot and play it. If no slots are currently available, it will be ignored.")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_PLAY,
+      "Play")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_PLAY_LOOPED,
+      "Play (Looped)")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_PLAY_SEQUENTIAL,
+      "Play (Sequential)")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_STOP,
+      "Stop")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_REMOVE,
+      "Remove")
+MSG_HASH(MENU_ENUM_LABEL_VALUE_MIXER_ACTION_VOLUME,
+      "Volume")

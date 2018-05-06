@@ -18,8 +18,7 @@ Released under the CC0: https://creativecommons.org/publicdomain/zero/1.0/
 
 /* Use at the end of the coroutine */
 #define CORO_LEAVE() \
-  } \
-  } \
+  } } \
   do { return 0; } while ( 0 )
 
 /* Go to the x label */
@@ -30,7 +29,6 @@ Released under the CC0: https://creativecommons.org/publicdomain/zero/1.0/
   } while ( 0 )
 
 /* Go to a subroutine, execution continues until the subroutine returns via RET */
-/* x is the subroutine label, y and z are the A and B arguments */
 #define CORO_GOSUB( x ) \
   do { \
     coro->stack[ coro->sp++ ] = __LINE__; \
@@ -54,30 +52,24 @@ Released under the CC0: https://creativecommons.org/publicdomain/zero/1.0/
     case __LINE__: ; \
   } while ( 0 )
 
+/* The coroutine entry point, never use 0 as a label */
+#define CORO_BEGIN 0
+
+/* Sets up the coroutine */
+#define CORO_SETUP() \
+  do { \
+    coro->step = CORO_BEGIN; \
+    coro->sp   = 0; \
+  } while ( 0 )
+
 #define CORO_STOP() \
   do { \
     return 0; \
   } while ( 0 )
 
-/* The coroutine entry point, never use 0 as a label */
-#define CORO_BEGIN 0
-
-/* Sets up a coroutine, x is a pointer to coro_t */
-#define CORO_SETUP( x ) \
-  do { \
-    ( x )->step = CORO_BEGIN; \
-    ( x )->sp = 0; \
-  } while ( 0 )
-
-#define CORO_VAR( x ) ( coro->x )
-
-/* A coroutine */
-typedef struct
-{
-  CORO_VARS
-  int step, sp;
+/* Add this macro to your coro_t structure containing the variables for the coroutine */
+#define CORO_FIELDS \
+  int step, sp; \
   int stack[ 8 ];
-}
-coro_t;
 
 #endif /* CORO_H */

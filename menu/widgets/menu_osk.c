@@ -32,7 +32,7 @@
 
 #include "../../input/input_driver.h"
 
-static const char *osk_grid[45]  = {NULL};
+static char *osk_grid[45]        = {NULL};
 
 static int osk_ptr               = 0;
 static enum osk_type osk_idx     = OSK_LOWERCASE_LATIN;
@@ -98,16 +98,16 @@ void menu_event_osk_append(int ptr)
       menu_event_set_osk_idx(OSK_LOWERCASE_LATIN);
    else if (string_is_equal(osk_grid[ptr],"\xe2\x8a\x95")) /* plus sign (next button) */
 #else
-   if (string_is_equal_fast(osk_grid[ptr], "Bksp", 4))
+   if (string_is_equal(osk_grid[ptr], "Bksp"))
       input_keyboard_event(true, '\x7f', '\x7f', 0, RETRO_DEVICE_KEYBOARD);
-   else if (string_is_equal_fast(osk_grid[ptr], "Enter", 5))
+   else if (string_is_equal(osk_grid[ptr], "Enter"))
       input_keyboard_event(true, '\n', '\n', 0, RETRO_DEVICE_KEYBOARD);
    else
-   if (string_is_equal_fast(osk_grid[ptr], "Upper", 5))
+   if (string_is_equal(osk_grid[ptr], "Upper"))
       menu_event_set_osk_idx(OSK_UPPERCASE_LATIN);
-   else if (string_is_equal_fast(osk_grid[ptr], "Lower", 5))
+   else if (string_is_equal(osk_grid[ptr], "Lower"))
       menu_event_set_osk_idx(OSK_LOWERCASE_LATIN);
-   else if (string_is_equal_fast(osk_grid[ptr], "Next", 4))
+   else if (string_is_equal(osk_grid[ptr], "Next"))
 #endif
       if (menu_event_get_osk_idx() < OSK_TYPE_LAST - 1)
          menu_event_set_osk_idx((enum osk_type)(menu_event_get_osk_idx() + 1));
@@ -148,7 +148,7 @@ void menu_event_osk_iterate(void)
    }
 }
 
-const char** menu_event_get_osk_grid(void)
+char** menu_event_get_osk_grid(void)
 {
    return osk_grid;
 }

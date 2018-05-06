@@ -43,11 +43,6 @@
 
 #define RARCH_SCALE_BASE 256
 
-#if defined(HAVE_CG) || defined(HAVE_HLSL) || defined(HAVE_GLSL) || defined(HAVE_SLANG)
-#ifndef HAVE_SHADER_MANAGER
-#define HAVE_SHADER_MANAGER
-#endif
-
 #include "video_shader_parse.h"
 
 #define VIDEO_SHADER_STOCK_BLEND (GFX_MAX_SHADERS - 1)
@@ -57,8 +52,6 @@
 #define VIDEO_SHADER_MENU_4      (GFX_MAX_SHADERS - 5)
 #define VIDEO_SHADER_MENU_5      (GFX_MAX_SHADERS - 6)
 #define VIDEO_SHADER_MENU_6      (GFX_MAX_SHADERS - 7)
-
-#endif
 
 #if defined(_XBOX360)
 #define DEFAULT_SHADER_TYPE RARCH_SHADER_HLSL
@@ -97,9 +90,14 @@ enum gfx_ctx_api
    GFX_CTX_OPENGL_ES_API,
    GFX_CTX_DIRECT3D8_API,
    GFX_CTX_DIRECT3D9_API,
+   GFX_CTX_DIRECT3D10_API,
+   GFX_CTX_DIRECT3D11_API,
+   GFX_CTX_DIRECT3D12_API,
    GFX_CTX_OPENVG_API,
    GFX_CTX_VULKAN_API,
-   GFX_CTX_GDI_API
+   GFX_CTX_GDI_API,
+   GFX_CTX_GX_API,
+   GFX_CTX_GX2_API
 };
 
 enum display_metric_types
@@ -115,7 +113,10 @@ enum display_flags
    GFX_CTX_FLAGS_NONE = 0,
    GFX_CTX_FLAGS_GL_CORE_CONTEXT,
    GFX_CTX_FLAGS_MULTISAMPLING,
-   GFX_CTX_FLAGS_CUSTOMIZABLE_SWAPCHAIN_IMAGES
+   GFX_CTX_FLAGS_CUSTOMIZABLE_SWAPCHAIN_IMAGES,
+   GFX_CTX_FLAGS_HARD_SYNC,
+   GFX_CTX_FLAGS_BLACK_FRAME_INSERTION,
+   GFX_CTX_FLAGS_MENU_FRAME_FILTERING
 };
 
 enum shader_uniform_type
@@ -202,18 +203,11 @@ struct uniform_info
 typedef struct shader_backend
 {
    void *(*init)(void *data, const char *path);
+   void (*init_menu_shaders)(void *data);
    void (*deinit)(void *data);
 
    /* Set shader parameters. */
-   void (*set_params)(void *data, void *shader_data,
-         unsigned width, unsigned height,
-         unsigned tex_width, unsigned tex_height,
-         unsigned out_width, unsigned out_height,
-         unsigned frame_counter,
-         const void *info,
-         const void *prev_info,
-         const void *feedback_info,
-         const void *fbo_info, unsigned fbo_info_cnt);
+   void (*set_params)(void *data, void *shader_data);
 
    void (*set_uniform_parameter)(void *data, struct uniform_info *param,
          void *uniform_data);
@@ -412,6 +406,8 @@ typedef struct video_frame_info
    bool black_frame_insertion;
    bool hard_sync;
    bool fps_show;
+   bool crt_switch_resolution; 
+   bool statistics_show;
    bool framecount_show;
    bool scale_integer;
    bool post_filter_record;
@@ -436,6 +432,7 @@ typedef struct video_frame_info
    unsigned aspect_ratio_idx;
    unsigned max_swapchain_images;
    unsigned monitor_index;
+   unsigned crt_switch_resolution_super; 
    unsigned width;
    unsigned height;
    unsigned xmb_theme;
@@ -460,6 +457,31 @@ typedef struct video_frame_info
    float xmb_alpha_factor;
 
    char fps_text[128];
+   char stat_text[512];
+   char chat_text[256];
+
+   uint64_t frame_count;
+   float frame_time;
+   float frame_rate;
+
+   struct
+   {
+      float x;
+      float y;
+      float scale;
+      /* Drop shadow color multiplier. */
+      float drop_mod;
+      /* Drop shadow offset.
+       * If both are 0, no drop shadow will be rendered. */
+      int drop_x, drop_y;
+      /* Drop shadow alpha */
+      float drop_alpha;
+      /* ABGR. Use the macros. */
+      uint32_t color;
+      bool full_screen;
+      enum text_alignment text_align;
+   } osd_stat_params;
+
    void (*cb_update_window_title)(void*, void *);
    void (*cb_swap_buffers)(void*, void *);
    bool (*cb_get_metrics)(void *data, enum display_metric_types type,
@@ -472,6 +494,7 @@ typedef struct video_frame_info
 
    void *context_data;
    void *shader_data;
+   void *userdata;
 } video_frame_info_t;
 
 typedef void (*update_window_title_cb)(void*, void*);
@@ -490,6 +513,8 @@ typedef struct gfx_ctx_driver
    void* (*init)(video_frame_info_t *video_info, void *video_driver);
    void (*destroy)(void *data);
 
+   enum gfx_ctx_api (*get_api)(void *data);
+
    /* Which API to bind to. */
    bool (*bind_api)(void *video_driver, enum gfx_ctx_api,
          unsigned major, unsigned minor);
@@ -503,6 +528,8 @@ typedef struct gfx_ctx_driver
    /* Gets current window size.
     * If not initialized yet, it returns current screen size. */
    void (*get_video_size)(void*, unsigned*, unsigned*);
+
+   float (*get_refresh_rate)(void*);
 
    void (*get_video_output_size)(void*, unsigned*, unsigned*);
 
@@ -670,6 +697,7 @@ struct aspect_ratio_elem
 
 typedef struct video_poke_interface
 {
+   uint32_t (*get_flags)(void *data);
    void (*set_coords)(void *handle_data, void *shader_data,
          const struct video_coords *coords);
    void (*set_mvp)(void *data, void *shader_data,
@@ -679,6 +707,7 @@ typedef struct video_poke_interface
    void (*unload_texture)(void *data, uintptr_t id);
    void (*set_video_mode)(void *data, unsigned width,
          unsigned height, bool fullscreen);
+   float (*get_refresh_rate)(void *data);
    void (*set_filtering)(void *data, unsigned index, bool smooth);
    void (*get_video_output_size)(void *data,
          unsigned *width, unsigned *height);
@@ -798,12 +827,8 @@ typedef struct video_driver
 
 typedef struct d3d_renderchain_driver
 {
-   void (*set_mvp)(void *chain_data,
-         void *data, unsigned vp_width,
-         unsigned vp_height, unsigned rotation);
    void (*chain_free)(void *data);
    void *(*chain_new)(void);
-   bool (*reinit)(void *data, const void *info_data);
    bool (*init)(void *data,
          const void *video_info_data,
          void *dev_data,
@@ -916,6 +941,7 @@ void video_driver_destroy(void);
 void video_driver_set_cached_frame_ptr(const void *data);
 void video_driver_set_stub_frame(void);
 void video_driver_unset_stub_frame(void);
+bool video_driver_is_stub_frame(void);
 bool video_driver_supports_recording(void);
 bool video_driver_supports_viewport_read(void);
 bool video_driver_supports_read_frame_raw(void);
@@ -934,6 +960,7 @@ void video_driver_free(void);
 void video_driver_free_hw_context(void);
 void video_driver_monitor_reset(void);
 void video_driver_set_aspect_ratio(void);
+void video_driver_update_viewport(struct video_viewport* vp, bool force_full, bool keep_aspect);
 void video_driver_show_mouse(void);
 void video_driver_hide_mouse(void);
 void video_driver_set_nonblock_state(bool toggle);
@@ -959,6 +986,7 @@ bool video_driver_is_video_cache_context(void);
 void video_driver_set_video_cache_context_ack(void);
 bool video_driver_is_video_cache_context_ack(void);
 void video_driver_set_active(void);
+void video_driver_unset_active(void);
 bool video_driver_is_active(void);
 bool video_driver_gpu_record_init(unsigned size);
 void video_driver_gpu_record_deinit(void);
@@ -1253,11 +1281,15 @@ bool video_context_driver_set_video_mode(gfx_ctx_mode_t *mode_info);
 
 bool video_context_driver_get_video_size(gfx_ctx_mode_t *mode_info);
 
+bool video_context_driver_get_refresh_rate(float *refresh_rate);
+
 bool video_context_driver_get_context_data(void *data);
 
 bool video_context_driver_show_mouse(bool *bool_data);
 
 void video_context_driver_set_data(void *data);
+
+bool video_driver_get_flags(gfx_ctx_flags_t *flags);
 
 bool video_context_driver_get_flags(gfx_ctx_flags_t *flags);
 
@@ -1283,12 +1315,9 @@ bool video_shader_driver_direct_get_current_shader(video_shader_ctx_t *shader);
 
 bool video_shader_driver_deinit(void);
 
-#define video_shader_driver_set_parameter(param) \
-   if (current_shader && current_shader->set_uniform_parameter) \
-      current_shader->set_uniform_parameter(shader_data, &param, NULL)
+void video_shader_driver_set_parameter(void *data);
 
-#define video_shader_driver_set_parameters(params) \
-   current_shader->set_params(params.data, shader_data, params.width, params.height, params.tex_width, params.tex_height, params.out_width, params.out_height, params.frame_counter, params.info, params.prev_info, params.feedback_info, params.fbo_info, params.fbo_info_cnt)
+void video_shader_driver_set_parameters(void *data);
 
 bool video_shader_driver_init_first(void);
 
@@ -1310,23 +1339,15 @@ bool video_shader_driver_filter_type(video_shader_ctx_filter_t *filter);
 
 bool video_shader_driver_compile_program(struct shader_program_info *program_info);
 
-#define video_shader_driver_use(shader_info) \
-   current_shader->use(shader_info.data, shader_data, shader_info.idx, shader_info.set_active)
+void video_shader_driver_use(void *data);
 
 bool video_shader_driver_wrap_type(video_shader_ctx_wrap_t *wrap);
 
-bool renderchain_d3d_init_first(
-      const d3d_renderchain_driver_t **renderchain_driver,
-      void **renderchain_handle);
-
-bool renderchain_gl_init_first(
-      const gl_renderchain_driver_t **renderchain_driver,
-      void **renderchain_handle);
+float video_driver_get_refresh_rate(void);
 
 extern bool (*video_driver_cb_has_focus)(void);
 
-extern shader_backend_t *current_shader;
-extern void *shader_data;
+bool video_driver_started_fullscreen(void);
 
 extern video_driver_t video_gl;
 extern video_driver_t video_vulkan;
@@ -1334,7 +1355,11 @@ extern video_driver_t video_psp1;
 extern video_driver_t video_vita2d;
 extern video_driver_t video_ctr;
 extern video_driver_t video_switch;
-extern video_driver_t video_d3d;
+extern video_driver_t video_d3d8;
+extern video_driver_t video_d3d9;
+extern video_driver_t video_d3d10;
+extern video_driver_t video_d3d11;
+extern video_driver_t video_d3d12;
 extern video_driver_t video_gx;
 extern video_driver_t video_wiiu;
 extern video_driver_t video_xenon360;
@@ -1358,7 +1383,6 @@ extern const gfx_ctx_driver_t gfx_ctx_sdl_gl;
 extern const gfx_ctx_driver_t gfx_ctx_x_egl;
 extern const gfx_ctx_driver_t gfx_ctx_wayland;
 extern const gfx_ctx_driver_t gfx_ctx_x;
-extern const gfx_ctx_driver_t gfx_ctx_d3d;
 extern const gfx_ctx_driver_t gfx_ctx_drm;
 extern const gfx_ctx_driver_t gfx_ctx_mali_fbdev;
 extern const gfx_ctx_driver_t gfx_ctx_vivante_fbdev;
@@ -1380,13 +1404,6 @@ extern const shader_backend_t gl_glsl_backend;
 extern const shader_backend_t hlsl_backend;
 extern const shader_backend_t gl_cg_backend;
 extern const shader_backend_t shader_null_backend;
-
-extern d3d_renderchain_driver_t d3d8_d3d_renderchain;
-extern d3d_renderchain_driver_t cg_d3d9_renderchain;
-extern d3d_renderchain_driver_t hlsl_d3d9_renderchain;
-extern d3d_renderchain_driver_t null_d3d_renderchain;
-
-extern gl_renderchain_driver_t gl2_renderchain;
 
 RETRO_END_DECLS
 

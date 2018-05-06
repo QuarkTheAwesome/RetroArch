@@ -50,6 +50,7 @@ typedef struct
    } native_window;
    bool resize;
    unsigned width, height;
+   float refresh_rate;
 } mali_ctx_data_t;
 
 static enum gfx_ctx_api mali_api           = GFX_CTX_NONE;
@@ -178,6 +179,10 @@ static bool gfx_ctx_mali_fbdev_set_video_mode(void *data,
    mali->native_window.width  = vinfo.xres;
    mali->native_window.height = vinfo.yres;
 
+   mali->refresh_rate = 1000000.0f / vinfo.pixclock * 1000000.0f /
+         (vinfo.yres + vinfo.upper_margin + vinfo.lower_margin + vinfo.vsync_len) /
+         (vinfo.xres + vinfo.left_margin  + vinfo.right_margin + vinfo.hsync_len);
+
 #ifdef HAVE_EGL
    if (!egl_create_context(&mali->egl, attribs))
    {
@@ -209,12 +214,21 @@ static void gfx_ctx_mali_fbdev_input_driver(void *data,
    *input_data = NULL;
 }
 
+static enum gfx_ctx_api gfx_ctx_mali_fbdev_get_api(void *data)
+{
+   return mali_api;
+}
+
 static bool gfx_ctx_mali_fbdev_bind_api(void *data,
       enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
    (void)data;
    mali_api = api;
-   return api == GFX_CTX_OPENGL_ES_API;
+
+   if (api == GFX_CTX_OPENGL_ES_API)
+      return true;
+
+   return false;
 }
 
 static bool gfx_ctx_mali_fbdev_has_focus(void *data)
@@ -277,13 +291,22 @@ static void gfx_ctx_mali_fbdev_set_flags(void *data, uint32_t flags)
    (void)data;
 }
 
+static float gfx_ctx_mali_fbdev_get_refresh_rate(void *data)
+{
+   mali_ctx_data_t *mali = (mali_ctx_data_t*)data;
+
+   return mali->refresh_rate;
+}
+
 const gfx_ctx_driver_t gfx_ctx_mali_fbdev = {
    gfx_ctx_mali_fbdev_init,
    gfx_ctx_mali_fbdev_destroy,
+   gfx_ctx_mali_fbdev_get_api,
    gfx_ctx_mali_fbdev_bind_api,
    gfx_ctx_mali_fbdev_set_swap_interval,
    gfx_ctx_mali_fbdev_set_video_mode,
    gfx_ctx_mali_fbdev_get_video_size,
+   gfx_ctx_mali_fbdev_get_refresh_rate,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */

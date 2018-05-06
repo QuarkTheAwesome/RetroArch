@@ -27,6 +27,8 @@ void* video_display_server_init(void)
 {
    enum rarch_display_type type = video_driver_display_type_get();
 
+   video_display_server_destroy();
+
    switch (type)
    {
       case RARCH_DISPLAY_WIN32:
@@ -54,7 +56,9 @@ void* video_display_server_init(void)
 
 void video_display_server_destroy(void)
 {
-
+   if (current_display_server && current_display_server->destroy)
+      if (current_display_server_data)
+         current_display_server->destroy(current_display_server_data);
 }
 
 bool video_display_server_set_window_opacity(unsigned opacity)
@@ -68,5 +72,21 @@ bool video_display_server_set_window_progress(int progress, bool finished)
 {
    if (current_display_server && current_display_server->set_window_progress)
       return current_display_server->set_window_progress(current_display_server_data, progress, finished);
+   return false;
+}
+
+bool video_display_server_set_window_decorations(bool on)
+{
+   if (current_display_server && current_display_server->set_window_decorations)
+      return current_display_server->set_window_decorations(current_display_server_data, on);
+   return false;
+}
+
+
+bool video_display_server_switch_resolution(unsigned width, unsigned height,
+      int int_hz, float hz)
+{
+   if (current_display_server && current_display_server->switch_resolution)
+      return current_display_server->switch_resolution(current_display_server_data, width, height, int_hz, hz);
    return false;
 }

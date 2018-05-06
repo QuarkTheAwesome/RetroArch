@@ -32,7 +32,6 @@
 
 int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
 {
-   uint32_t driver_hash = 0;
    settings_t      *settings = config_get_ptr();
 
    if (msg <= MENU_ENUM_LABEL_INPUT_HOTKEY_BIND_END &&
@@ -53,6 +52,10 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   " \n"
                   "放开按键来取消快进。"
                   );
+            break;
+         case RARCH_SLOWMOTION_HOLD_KEY:
+            snprintf(s, len,
+                  "按住并以慢动作运行。");
             break;
          case RARCH_PAUSE_TOGGLE:
             snprintf(s, len,
@@ -91,14 +94,6 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
          case RARCH_OSK:
             snprintf(s, len,
                   "显示/隐藏屏显键盘。");
-            break;
-         case RARCH_NETPLAY_FLIP:
-            snprintf(s, len,
-                  "Netplay flip users.");
-            break;
-         case RARCH_SLOWMOTION:
-            snprintf(s, len,
-                  "按住并以慢动作运行。");
             break;
          case RARCH_ENABLE_HOTKEY:
             snprintf(s, len,
@@ -677,12 +672,10 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                );
          break;
       case MENU_ENUM_LABEL_INPUT_DRIVER:
-         if (settings)
-            driver_hash = msg_hash_calculate(settings->arrays.input_driver);
-
-         switch (driver_hash)
          {
-            case MENU_LABEL_INPUT_DRIVER_UDEV:
+            const char *lbl = settings ? settings->arrays.input_driver : NULL;
+
+            if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_DRIVER_UDEV)))
                snprintf(s, len,
                      "udev Input driver. \n"
                      " \n"
@@ -701,8 +694,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                      "are root-only (mode 600). You can set up a udev \n"
                      "rule which makes these accessible to non-root."
                      );
-               break;
-            case MENU_LABEL_INPUT_DRIVER_LINUXRAW:
+            else if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_INPUT_DRIVER_LINUXRAW)))
                snprintf(s, len,
                      "linuxraw Input driver. \n"
                      " \n"
@@ -712,14 +704,12 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                      " \n"
                      "This driver uses the older joystick API \n"
                      "(/dev/input/js*).");
-               break;
-            default:
+            else
                snprintf(s, len,
                      "Input driver.\n"
                      " \n"
                      "Depending on video driver, it might \n"
                      "force a different input driver.");
-               break;
          }
          break;
       case MENU_ENUM_LABEL_LOAD_CONTENT_LIST:
@@ -757,7 +747,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
          snprintf(s, len,
                "当前视频驱动.");
 
-         if (string_is_equal_fast(settings->arrays.video_driver, "gl", 2))
+         if (string_is_equal(settings->arrays.video_driver, "gl"))
          {
             snprintf(s, len,
                   "OpenGL视频驱动. \n"
@@ -771,7 +761,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "dependent on your graphics card's \n"
                   "underlying GL driver).");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sdl2", 4))
+         else if (string_is_equal(settings->arrays.video_driver, "sdl2"))
          {
             snprintf(s, len,
                   "SDL 2 视频驱动.\n"
@@ -783,7 +773,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "core implementations is dependent \n"
                   "on your platform SDL implementation.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sdl1", 4))
+         else if (string_is_equal(settings->arrays.video_driver, "sdl1"))
          {
             snprintf(s, len,
                   "SDL 视频驱动.\n"
@@ -794,7 +784,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Performance is considered to be suboptimal. \n"
                   "Consider using it only as a last resort.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "d3d", 3))
+         else if (string_is_equal(settings->arrays.video_driver, "d3d"))
          {
             snprintf(s, len,
                   "Direct3D 视频驱动. \n"
@@ -803,7 +793,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "is dependent on your graphic card's \n"
                   "underlying D3D driver).");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "exynos", 6))
+         else if (string_is_equal(settings->arrays.video_driver, "exynos"))
          {
             snprintf(s, len,
                   "Exynos-G2D 视频驱动. \n"
@@ -815,7 +805,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "Performance for software rendered cores \n"
                   "should be optimal.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "drm", 3))
+         else if (string_is_equal(settings->arrays.video_driver, "drm"))
          {
             snprintf(s, len,
                   "Plain DRM 视频驱动. \n"
@@ -824,7 +814,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                   "libdrm for hardware scaling using \n"
                   "GPU overlays.");
          }
-         else if (string_is_equal_fast(settings->arrays.video_driver, "sunxi", 5))
+         else if (string_is_equal(settings->arrays.video_driver, "sunxi"))
          {
             snprintf(s, len,
                   "Sunxi-G2D 视频驱动. \n"
@@ -841,23 +831,17 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                );
          break;
       case MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER:
-         if (settings)
-            driver_hash = msg_hash_calculate(settings->arrays.audio_resampler);
-
-         switch (driver_hash)
          {
-            case MENU_LABEL_AUDIO_RESAMPLER_DRIVER_SINC:
-               snprintf(s, len,
-                     "Windowed SINC implementation.");
-               break;
-            case MENU_LABEL_AUDIO_RESAMPLER_DRIVER_CC:
-               snprintf(s, len,
-                     "Convoluted Cosine implementation.");
-               break;
-            default:
-               if (string_is_empty(s))
-                  strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE), len);
-               break;
+            const char *lbl = settings ? settings->arrays.audio_resampler : NULL;
+
+            if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER_SINC)))
+               strlcpy(s,
+                     "Windowed SINC implementation.", len);
+            else if (string_is_equal(lbl, msg_hash_to_str(MENU_ENUM_LABEL_AUDIO_RESAMPLER_DRIVER_CC)))
+               strlcpy(s,
+                     "Convoluted Cosine implementation.", len);
+            else if (string_is_empty(s))
+               strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_INFORMATION_AVAILABLE), len);
          }
          break;
       case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET:
@@ -1641,11 +1625,6 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                "The username of the person running RetroArch. \n"
                "This will be used for playing online games.");
          break;
-      case MENU_ENUM_LABEL_NETPLAY_CLIENT_SWAP_INPUT:
-         snprintf(s, len,
-               "When being client over netplay, use \n"
-               "keybinds for player 1.");
-         break;
       case MENU_ENUM_LABEL_NETPLAY_TCP_UDP_PORT:
          snprintf(s, len,
                "The port of the host IP address. \n"
@@ -1748,10 +1727,6 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
          snprintf(s, len,
                "Saves state.");
          break;
-      case MENU_ENUM_LABEL_NETPLAY_FLIP_PLAYERS:
-         snprintf(s, len,
-               "Netplay flip users.");
-         break;
       case MENU_ENUM_LABEL_CHEAT_INDEX_PLUS:
          snprintf(s, len,
                "Increment cheat index.\n");
@@ -1785,7 +1760,7 @@ int menu_hash_get_help_chs_enum(enum msg_hash_enums msg, char *s, size_t len)
                "Hold for fast-forward. Releasing button \n"
                "disables fast-forward.");
          break;
-      case MENU_ENUM_LABEL_SLOWMOTION:
+      case MENU_ENUM_LABEL_SLOWMOTION_HOLD:
          snprintf(s, len,
                "Hold for slowmotion.");
          break;

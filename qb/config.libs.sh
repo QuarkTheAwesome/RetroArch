@@ -22,6 +22,7 @@ PTHREADLIB=-lpthread
 SOCKETLIB=-lc
 SOCKETHEADER=
 INCLUDES='usr/include usr/local/include'
+SORT='sort'
 
 if [ "$OS" = 'BSD' ]; then
    [ -d /usr/local/include ] && add_dirs INCLUDE /usr/local/include
@@ -39,8 +40,11 @@ elif [ "$OS" = 'Win32' ]; then
    DYLIB=
 elif [ "$OS" = 'Cygwin' ]; then
    die 1 'Error: Cygwin is not a supported platform. See https://bot.libretro.com/docs/compilation/windows/'
+elif [ "$OS" = 'SunOS' ]; then
+   SORT='gsort'
 fi
 
+add_define MAKEFILE DATA_DIR "$SHARE_DIR"
 add_define MAKEFILE DYLIB_LIB "$DYLIB"
 
 check_lib '' SYSTEMD -lsystemd sd_get_machine_names
@@ -154,9 +158,10 @@ fi
    add_define MAKEFILE libretro "$LIBRETRO"
 }
 
-add_define MAKEFILE ASSETS_DIR "${ASSETS_DIR:-${PREFIX}/share}"
+add_define MAKEFILE ASSETS_DIR "${ASSETS_DIR:-$SHARE_DIR}/retroarch"
 add_define MAKEFILE BIN_DIR "${BIN_DIR:-${PREFIX}/bin}"
-add_define MAKEFILE MAN_DIR "${MAN_DIR:-${PREFIX}/share/man}"
+add_define MAKEFILE DOC_DIR "${DOC_DIR:-${SHARE_DIR}/doc/retroarch}"
+add_define MAKEFILE MAN_DIR "${MAN_DIR:-${SHARE_DIR}/man}"
 
 if [ "$OS" = 'DOS' ]; then
    HAVE_SHADERPIPELINE=no
@@ -205,7 +210,6 @@ if [ "$HAVE_NETWORKING" = 'yes' ]; then
    check_lib '' MINIUPNPC '-lminiupnpc'
 else
    die : 'Warning: All networking features have been disabled.'
-   HAVE_KEYMAPPER='no'
    HAVE_NETWORK_CMD='no'
    HAVE_NETWORKGAMEPAD='no'
    HAVE_CHEEVOS='no'
@@ -266,6 +270,31 @@ check_val '' PULSE -lpulse
 check_val '' SDL -lSDL SDL
 check_val '' SDL2 -lSDL2 SDL2
 
+check_enabled QT 'Qt companion'
+
+if [ "$HAVE_QT" != 'no' ] && [ "$MOC_PATH" != 'none' ]; then
+   check_pkgconf QT5CORE Qt5Core 5.2
+   check_pkgconf QT5GUI Qt5Gui 5.2
+   check_pkgconf QT5WIDGETS Qt5Widgets 5.2
+   #check_pkgconf QT5WEBENGINE Qt5WebEngine 5.4
+
+   check_val '' QT5CORE -lQt5Core QT5CORE
+   check_val '' QT5GUI -lQt5Gui QT5GUI
+   check_val '' QT5WIDGETS -lQt5Widgets QT5WIDGETS
+   #check_val '' QT5WEBENGINE -lQt5WebEngine QT5WEBENGINE
+
+   if [ "$HAVE_QT5CORE" = "no" ] || [ "$HAVE_QT5GUI" = "no" ] || [ "$HAVE_QT5WIDGETS" = "no" ]; then
+      die : 'Notice: Not building Qt support, required libraries were not found.'
+      HAVE_QT=no
+   else
+      HAVE_QT=yes
+   fi
+
+   #if [ "$HAVE_QT5WEBENGINE" = "no" ]; then
+   #   die : 'Notice: Qt5WebEngine not found, disabling web browser support.'
+   #fi
+fi
+
 if [ "$HAVE_SDL2" = 'yes' ] && [ "$HAVE_SDL" = 'yes' ]; then
    die : 'Notice: SDL drivers will be replaced by SDL2 ones.'
    HAVE_SDL=no
@@ -294,6 +323,9 @@ if [ "$OS" = 'Win32' ]; then
    HAVE_XAUDIO=yes
 else
    HAVE_D3D9=no
+   HAVE_D3D10=no
+   HAVE_D3D11=no
+   HAVE_D3D12=no
 fi
 
 if [ "$HAVE_OPENGL" != 'no' ] && [ "$HAVE_OPENGLES" != 'yes' ]; then
@@ -457,6 +489,8 @@ fi
 check_lib '' STRCASESTR "$CLIB" strcasestr
 check_lib '' MMAP "$CLIB" mmap
 
+check_enabled VULKAN vulkan
+
 if [ "$HAVE_VULKAN" != "no" ] && [ "$OS" = 'Win32' ]; then
    HAVE_VULKAN=yes
 else
@@ -514,6 +548,6 @@ while [ $# -gt 0 ]; do
    var="${tmpvar#HAVE_}"
    vars="${vars} $var"
 done
-VARS="$(printf %s "$vars" | tr ' ' '\n' | sort)"
+VARS="$(printf %s "$vars" | tr ' ' '\n' | $SORT)"
 create_config_make config.mk $(printf %s "$VARS")
 create_config_header config.h $(printf %s "$VARS")

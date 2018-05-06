@@ -52,6 +52,10 @@
 #include "file_path_special.h"
 #include "verbosity.h"
 
+#ifdef HAVE_QT
+#include "ui/ui_companion_driver.h"
+#endif
+
 /* If this is non-NULL. RARCH_LOG and friends
  * will write to this file. */
 static FILE *log_file_fp         = NULL;
@@ -101,7 +105,7 @@ void retro_main_log_file_init(const char *path)
    if (path == NULL)
       return;
 
-   log_file_fp          = fopen_utf8(path, "wb");
+   log_file_fp          = (FILE*)fopen_utf8(path, "wb");
    log_file_initialized = true;
 
    /* TODO: this is only useful for a few platforms, find which and add ifdef */
@@ -122,24 +126,17 @@ void retro_main_log_file_deinit(void)
 void RARCH_LOG_V(const char *tag, const char *fmt, va_list ap)
 {
 #if TARGET_OS_IPHONE
-   static int asl_initialized = 0;
-#if !TARGET_IPHONE_SIMULATOR
-static aslclient asl_client;
-#endif
-#else
-   FILE *fp = NULL;
-   (void)fp;
-#endif
-
-   if (!verbosity_is_enabled())
-      return;
-#if TARGET_OS_IPHONE
 #if TARGET_IPHONE_SIMULATOR
    vprintf(fmt, ap);
 #else
+   static aslclient asl_client;
+   static int asl_initialized = 0;
    if (!asl_initialized)
    {
-      asl_client = asl_open(file_path_str(FILE_PATH_PROGRAM_NAME), "com.apple.console", ASL_OPT_STDERR | ASL_OPT_NO_DELAY);
+      asl_client      = asl_open(
+            file_path_str(FILE_PATH_PROGRAM_NAME),
+            "com.apple.console",
+            ASL_OPT_STDERR | ASL_OPT_NO_DELAY);
       asl_initialized = 1;
    }
    aslmsg msg = asl_new(ASL_TYPE_MSG);
@@ -151,43 +148,99 @@ static aslclient asl_client;
 #endif
 #elif defined(_XBOX1)
    {
-   /* FIXME: Using arbitrary string as fmt argument is unsafe. */
-   char msg_new[1024];
-   char buffer[1024];
+      /* FIXME: Using arbitrary string as fmt argument is unsafe. */
+      char msg_new[1024];
+      char buffer[1024];
 
-   msg_new[0] = buffer[0] = '\0';
-   snprintf(msg_new, sizeof(msg_new), "%s: %s %s",
-         file_path_str(FILE_PATH_PROGRAM_NAME),
-         tag ? tag : "",
-         fmt);
-   wvsprintf(buffer, msg_new, ap);
-   OutputDebugStringA(buffer);
+      msg_new[0] = buffer[0] = '\0';
+      snprintf(msg_new, sizeof(msg_new), "%s: %s %s",
+            file_path_str(FILE_PATH_PROGRAM_NAME),
+            tag ? tag : "",
+            fmt);
+      wvsprintf(buffer, msg_new, ap);
+      OutputDebugStringA(buffer);
    }
 #elif defined(ANDROID)
-   int prio = ANDROID_LOG_INFO;
-   if (tag)
    {
-      if (string_is_equal(file_path_str(FILE_PATH_LOG_WARN), tag))
-         prio = ANDROID_LOG_WARN;
-      else if (string_is_equal(file_path_str(FILE_PATH_LOG_ERROR), tag))
-         prio = ANDROID_LOG_ERROR;
+      int prio = ANDROID_LOG_INFO;
+      if (tag)
+      {
+         if (string_is_equal(file_path_str(FILE_PATH_LOG_WARN), tag))
+            prio = ANDROID_LOG_WARN;
+         else if (string_is_equal(file_path_str(FILE_PATH_LOG_ERROR), tag))
+            prio = ANDROID_LOG_ERROR;
+      }
+      __android_log_vprint(prio,
+            file_path_str(FILE_PATH_PROGRAM_NAME),
+            fmt,
+            ap);
    }
-   __android_log_vprint(prio,
-         file_path_str(FILE_PATH_PROGRAM_NAME),
-         fmt,
-         ap);
 #else
 
+   {
+#ifdef HAVE_QT
+      char buffer[1024];
+#endif
 #ifdef HAVE_FILE_LOGGER
-   fp = (FILE*)retro_main_log_file();
+      FILE *fp = (FILE*)retro_main_log_file();
 #else
-   fp = stderr;
+      FILE *fp = stderr;
 #endif
-   fprintf(fp, "%s ",
-         tag ? tag : file_path_str(FILE_PATH_LOG_INFO));
-   vfprintf(fp, fmt, ap);
-   fflush(fp);
+
+#ifdef HAVE_QT
+      buffer[0] = '\0';
+      vsnprintf(buffer, sizeof(buffer), fmt, ap);
+
+      if (fp)
+      {
+         fprintf(fp, "%s %s", tag ? tag : file_path_str(FILE_PATH_LOG_INFO), buffer);
+         fflush(fp);
+      }
+
+      ui_companion_driver_log_msg(buffer);
+#else
+      if (fp)
+      {
+         fprintf(fp, "%s ",
+               tag ? tag : file_path_str(FILE_PATH_LOG_INFO));
+         vfprintf(fp, fmt, ap);
+         fflush(fp);
+      }
 #endif
+   }
+#endif
+}
+
+void RARCH_LOG_BUFFER(uint8_t *data, size_t size)
+{
+   unsigned i, offset;
+   int padding = size % 16;
+   uint8_t buf[16];
+
+   RARCH_LOG("== %d-byte buffer ==================\n", size);
+
+   for(i = 0, offset = 0; i < size; i++)
+   {
+      buf[offset] = data[i];
+      offset++;
+
+      if (offset == 16)
+      {
+         offset = 0;
+         RARCH_LOG("%02x%02x%02x%02x%02x%02x%02x%02x  %02x%02x%02x%02x%02x%02x%02x%02x\n",
+            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+            buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]);
+      }
+   }
+   if(padding)
+   {
+      for(i = padding; i < 16; i++)
+         buf[i] = 0xff;
+      RARCH_LOG("%02x%02x%02x%02x%02x%02x%02x%02x  %02x%02x%02x%02x%02x%02x%02x%02x\n",
+         buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+         buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]);
+   }
+   RARCH_LOG("==================================\n");
 }
 
 void RARCH_LOG(const char *fmt, ...)
@@ -202,11 +255,6 @@ void RARCH_LOG(const char *fmt, ...)
    va_end(ap);
 }
 
-void RARCH_LOG_OUTPUT_V(const char *tag, const char *msg, va_list ap)
-{
-   RARCH_LOG_V(tag, msg, ap);
-}
-
 void RARCH_LOG_OUTPUT(const char *msg, ...)
 {
    va_list ap;
@@ -215,27 +263,25 @@ void RARCH_LOG_OUTPUT(const char *msg, ...)
    va_end(ap);
 }
 
-void RARCH_WARN_V(const char *tag, const char *fmt, va_list ap)
-{
-   RARCH_LOG_V(tag, fmt, ap);
-}
-
 void RARCH_WARN(const char *fmt, ...)
 {
    va_list ap;
+
+   if (!verbosity_is_enabled())
+      return;
+
    va_start(ap, fmt);
    RARCH_WARN_V(file_path_str(FILE_PATH_LOG_WARN), fmt, ap);
    va_end(ap);
 }
 
-void RARCH_ERR_V(const char *tag, const char *fmt, va_list ap)
-{
-   RARCH_LOG_V(tag, fmt, ap);
-}
-
 void RARCH_ERR(const char *fmt, ...)
 {
    va_list ap;
+
+   if (!verbosity_is_enabled())
+      return;
+
    va_start(ap, fmt);
    RARCH_ERR_V(file_path_str(FILE_PATH_LOG_ERROR), fmt, ap);
    va_end(ap);

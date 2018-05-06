@@ -250,6 +250,17 @@ static bool vita2d_gfx_frame(void *data, const void *frame,
          }
       }
    }
+   else if (video_info->statistics_show)
+   {
+      struct font_params *osd_params = (struct font_params*)
+         &video_info->osd_stat_params;
+
+      if (osd_params)
+      {
+         font_driver_render_msg(video_info, NULL, video_info->stat_text,
+               (const struct font_params*)&video_info->osd_stat_params);
+      }
+   }
 
    if(!string_is_empty(msg))
       font_driver_render_msg(video_info, NULL, msg, NULL);
@@ -779,11 +790,13 @@ static bool vita_get_current_sw_framebuffer(void *data,
 }
 
 static const video_poke_interface_t vita_poke_interface = {
+   NULL, /* get_flags */
    NULL,                /* set_coords */
    NULL,                /* set_mvp */
    vita_load_texture,
    vita_unload_texture,
    NULL,
+   NULL, /* get_refresh_rate */
    vita_set_filtering,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
@@ -799,7 +812,7 @@ static const video_poke_interface_t vita_poke_interface = {
    NULL,
    NULL,
    vita_get_current_sw_framebuffer,
-   NULL,
+   NULL
  };
 
 static void vita2d_gfx_get_poke_interface(void *data,

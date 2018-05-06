@@ -369,7 +369,8 @@ static bool sdl_gfx_frame(void *data, const void *frame, unsigned width,
       SDL_BlitSurface(vid->menu.frame, NULL, vid->screen, NULL);
 
    if (msg)
-      sdl_render_msg(vid, vid->screen, msg, vid->screen->w, vid->screen->h, vid->screen->format);
+      sdl_render_msg(vid, vid->screen,
+            msg, vid->screen->w, vid->screen->h, vid->screen->format);
 
    if (SDL_MUSTLOCK(vid->screen))
       SDL_UnlockSurface(vid->screen);
@@ -499,14 +500,12 @@ static void sdl_set_texture_enable(void *data, bool state, bool full_screen)
 }
 
 
-#ifdef HAVE_MENU
 static void sdl_show_mouse(void *data, bool state)
 {
    (void)data;
 
    SDL_ShowCursor(state);
 }
-#endif
 
 static void sdl_grab_mouse_toggle(void *data)
 {
@@ -518,11 +517,13 @@ static void sdl_grab_mouse_toggle(void *data)
 }
 
 static const video_poke_interface_t sdl_poke_interface = {
+   NULL, /* get_flags */
    NULL,                /* set_coords */
    NULL,                /* set_mvp */
    NULL,
    NULL,
    NULL,
+   NULL, /* get_refresh_rate */
    sdl_set_filtering,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
@@ -534,13 +535,11 @@ static const video_poke_interface_t sdl_poke_interface = {
    sdl_set_texture_frame,
    sdl_set_texture_enable,
    NULL,
-#ifdef HAVE_MENU
    sdl_show_mouse,
-#else
-   NULL,
-#endif
    sdl_grab_mouse_toggle,
-   NULL
+   NULL,                         /* get_current_shader */
+   NULL,                         /* get_current_software_framebuffer */
+   NULL                          /* get_hw_render_interface */
 };
 
 static void sdl_get_poke_interface(void *data, const video_poke_interface_t **iface)

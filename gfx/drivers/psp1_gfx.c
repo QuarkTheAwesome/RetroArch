@@ -831,11 +831,13 @@ static void psp_viewport_info(void *data, struct video_viewport *vp)
 }
 
 static const video_poke_interface_t psp_poke_interface = {
+   NULL,          /* get_flags  */
    NULL,          /* set_coords */
    NULL,          /* set_mvp */
    NULL,
    NULL,
    NULL,
+   NULL, /* get_refresh_rate */
    psp_set_filtering,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
@@ -846,9 +848,12 @@ static const video_poke_interface_t psp_poke_interface = {
    psp_apply_state_changes,
    psp_set_texture_frame,
    psp_set_texture_enable,
-   NULL,
-   NULL,
-   NULL
+   NULL,                        /* set_osd_msg */
+   NULL,                        /* show_mouse  */
+   NULL,                        /* grab_mouse_toggle */
+   NULL,                        /* get_current_shader */
+   NULL,                        /* get_current_software_framebuffer */
+   NULL                         /* get_hw_render_interface */
 };
 
 static void psp_get_poke_interface(void *data,

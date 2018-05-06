@@ -39,6 +39,7 @@
 #include "../font_driver.h"
 #include "../../retroarch.h"
 #include "../../verbosity.h"
+#include "../common/drm_common.h"
 
 #include "drm_pixformats.h"
 
@@ -405,19 +406,24 @@ static bool format_support(const drmModePlanePtr ovr, uint32_t fmt)
 static uint64_t drm_plane_type(drmModePlane *plane)
 {
    int i,j;
-   /* The property values and their names are stored in different arrays, so we
-    * access them simultaneously here.
-    * We are interested in OVERLAY planes only, that's type 0 or DRM_PLANE_TYPE_OVERLAY
+
+   /* The property values and their names are stored in different arrays, 
+    * so we access them simultaneously here.
+    * We are interested in OVERLAY planes only, that's 
+    * type 0 or DRM_PLANE_TYPE_OVERLAY
     * (see /usr/xf86drmMode.h for definition). */
    drmModeObjectPropertiesPtr props =
-      drmModeObjectGetProperties(drm.fd, plane->plane_id, DRM_MODE_OBJECT_PLANE);
+      drmModeObjectGetProperties(drm.fd, plane->plane_id,
+            DRM_MODE_OBJECT_PLANE);
 
    for (j = 0; j < props->count_props; j++)
    {
       /* found the type property */
-      if (string_is_equal_fast(drmModeGetProperty(drm.fd, props->props[j])->name, "type", 4))
+      if (string_is_equal(
+               drmModeGetProperty(drm.fd, props->props[j])->name, "type"))
          return (props->prop_values[j]);
    }
+
    return (0);
 }
 
@@ -678,6 +684,7 @@ static bool init_drm(void)
     * on exit in case we change it. */
    drm.orig_crtc = drmModeGetCrtc(drm.fd, drm.encoder->crtc_id);
    drm.current_mode = &(drm.orig_crtc->mode);
+   g_drm_mode = drm.current_mode;
 
    /* Set mode physical video mode. Not really needed, but clears TTY console. */
    struct modeset_buf buf;
@@ -959,11 +966,13 @@ static void drm_set_aspect_ratio (void *data, unsigned aspect_ratio_idx)
 }
 
 static const video_poke_interface_t drm_poke_interface = {
+   NULL, /* get_flags */
    NULL, /* set_coords */
    NULL, /* set_mvp    */
    NULL,
    NULL,
    NULL, /* set_video_mode */
+   drm_get_refresh_rate,
    NULL, /* set_filtering */
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
@@ -974,8 +983,12 @@ static const video_poke_interface_t drm_poke_interface = {
    NULL, /* drm_apply_state_changes */
    drm_set_texture_frame,
    drm_set_texture_enable,
-   NULL, /* drm_set_osd_msg */
-   NULL  /* drm_show_mouse */
+   NULL,                         /* drm_set_osd_msg */
+   NULL,                         /* drm_show_mouse */
+   NULL,                         /* grab_mouse_toggle */
+   NULL,                         /* get_current_shader */
+   NULL,                         /* get_current_software_framebuffer */
+   NULL                          /* get_hw_render_interface */
 };
 
 static void drm_gfx_get_poke_interface(void *data,
@@ -1001,6 +1014,8 @@ static void drm_gfx_free(void *data)
    slock_free(_drmvars->pending_mutex);
    slock_free(_drmvars->vsync_cond_mutex);
    scond_free(_drmvars->vsync_condition);
+
+   g_drm_mode = NULL;
 
    free(_drmvars);
 }

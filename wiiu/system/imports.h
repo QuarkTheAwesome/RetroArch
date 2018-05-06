@@ -29,12 +29,15 @@ IMPORT(OSSetThreadCleanupCallback);
 IMPORT(OSResumeThread);
 IMPORT(OSIsThreadSuspended);
 IMPORT(OSSuspendThread);
+IMPORT(OSGetCurrentThread);
+IMPORT(OSExitThread);
 IMPORT(OSJoinThread);
 IMPORT(OSYieldThread);
 IMPORT(OSGetCoreId);
 IMPORT(OSIsMainCore);
 IMPORT(OSGetSystemTime);
 IMPORT(OSGetSystemTick);
+IMPORT(OSGetTime);
 IMPORT(OSGetSymbolName);
 IMPORT(OSGetSharedData);
 IMPORT(OSEffectiveToPhysical);
@@ -270,6 +273,7 @@ IMPORT(KBDTeardown);
 IMPORT_END();
 
 /* syshid */
+#ifdef WIIU_HID
 IMPORT_BEGIN(nsyshid);
 
 IMPORT(HIDSetup);
@@ -287,3 +291,4 @@ IMPORT(HIDRead);
 IMPORT(HIDWrite);
 
 IMPORT_END();
+#endif

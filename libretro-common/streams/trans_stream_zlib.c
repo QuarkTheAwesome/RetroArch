@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (trans_stream_zlib.c).
@@ -69,13 +69,14 @@ static void zlib_inflate_stream_free(void *data)
       return;
    if (z->inited)
       inflateEnd(&z->z);
-   free(z);
+   if (z)
+      free(z);
 }
 
 static bool zlib_deflate_define(void *data, const char *prop, uint32_t val)
 {
    struct zlib_trans_stream *z = (struct zlib_trans_stream *) data;
-   if (string_is_equal_fast(prop, "level", 5))
+   if (string_is_equal(prop, "level"))
    {
       if (z)
          z->ex = (int) val;
@@ -87,7 +88,7 @@ static bool zlib_deflate_define(void *data, const char *prop, uint32_t val)
 static bool zlib_inflate_define(void *data, const char *prop, uint32_t val)
 {
    struct zlib_trans_stream *z = (struct zlib_trans_stream *) data;
-   if (string_is_equal_fast(prop, "window_bits", 11))
+   if (string_is_equal(prop, "window_bits"))
    {
       if (z)
          z->ex = (int) val;

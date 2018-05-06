@@ -24,8 +24,26 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/utsname.h>
 #include <sys/resource.h>
+
+#ifdef __linux__
+#include <linux/version.h>
+/* inotify API was added in 2.6.13 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
+#define HAS_INOTIFY
+#define INOTIFY_BUF_LEN (1024 * (sizeof(struct inotify_event) + 16))
+
+#include <sys/inotify.h>
+
+#define VECTOR_LIST_TYPE int
+#define VECTOR_LIST_NAME int
+#include "../../libretro-common/lists/vector_list.c"
+#undef VECTOR_LIST_TYPE
+#undef VECTOR_LIST_NAME
+#endif
+#endif
 
 #include <signal.h>
 #include <pthread.h>
@@ -36,15 +54,13 @@
 
 #ifdef ANDROID
 #include <sys/system_properties.h>
-#ifdef __arm__
-#include <machine/cpu-features.h>
-#endif
 #endif
 
 #include <boolean.h>
 #include <retro_dirent.h>
 #include <retro_inline.h>
 #include <compat/strl.h>
+#include <compat/fopen_utf8.h>
 #include <rhash.h>
 #include <lists/file_list.h>
 #include <file/file_path.h>
@@ -81,7 +97,6 @@ enum
 
 struct android_app *g_android;
 
-
 static pthread_key_t thread_key;
 
 static char screenshot_dir[PATH_MAX_LENGTH];
@@ -102,6 +117,17 @@ static volatile sig_atomic_t unix_sighandler_quit;
 
 #ifndef HAVE_DYNAMIC
 static enum frontend_fork unix_fork_mode = FRONTEND_FORK_NONE;
+#endif
+
+#ifdef HAS_INOTIFY
+typedef struct inotify_data
+{
+   int fd;
+   int flags;
+   struct int_vector_list *wd_list;
+   struct string_list *path_list;
+} inotify_data_t;
+
 #endif
 
 int system_property_get(const char *command,
@@ -634,22 +660,14 @@ static bool make_proc_acpi_key_val(char **_ptr, char **_key, char **_val)
     return true;
 }
 
-#define ACPI_KEY_STATE                 0x10614a06U
-#define ACPI_KEY_PRESENT               0xc28ac046U
-#define ACPI_KEY_CHARGING_STATE        0x5ba13e29U
-#define ACPI_KEY_REMAINING_CAPACITY    0xf36952edU
-#define ACPI_KEY_DESIGN_CAPACITY       0x05e6488dU
-
 #define ACPI_VAL_CHARGING_DISCHARGING  0xf268327aU
-#define ACPI_VAL_CHARGING              0x095ee228U
-#define ACPI_VAL_YES                   0x0b88c316U
 #define ACPI_VAL_ONLINE                0x6842bf17U
 
 static void check_proc_acpi_battery(const char * node, bool * have_battery,
       bool * charging, int *seconds, int *percent)
 {
-   const char *base  = proc_acpi_battery_path;
    char path[1024];
+   const char *base  = proc_acpi_battery_path;
    ssize_t length    = 0;
    char         *ptr = NULL;
    char  *buf        = NULL;
@@ -681,33 +699,35 @@ static void check_proc_acpi_battery(const char * node, bool * have_battery,
 
    while (make_proc_acpi_key_val(&ptr, &key, &val))
    {
-      uint32_t key_hash = djb2_calculate(key);
-      uint32_t val_hash = djb2_calculate(val);
-
-      switch (key_hash)
+      if (string_is_equal(key, "present"))
       {
-         case ACPI_KEY_PRESENT:
-            if (val_hash == ACPI_VAL_YES)
-               *have_battery = true;
-            break;
-         case ACPI_KEY_CHARGING_STATE:
+         if (string_is_equal(val, "yes"))
+            *have_battery = true;
+      }
+      else if (string_is_equal(key, "charging state"))
+      {
+         if (string_is_equal(val, "charging"))
+            charge = true;
+         else
+         {
+            uint32_t val_hash = djb2_calculate(val);
+
             switch (val_hash)
             {
                case ACPI_VAL_CHARGING_DISCHARGING:
-               case ACPI_VAL_CHARGING:
                   charge = true;
                   break;
+               default:
+                  break;
             }
-            break;
-         case ACPI_KEY_REMAINING_CAPACITY:
-            {
-               char  *endptr = NULL;
-               const int cvt = (int)strtol(val, &endptr, 10);
+         }
+      }
+      else if (string_is_equal(key, "remaining capacity"))
+      {
+         char *endptr = NULL;
 
-               if (*endptr == ' ')
-                  remaining = cvt;
-            }
-            break;
+         if (endptr && *endptr == ' ')
+            remaining = (int)strtol(val, &endptr, 10);
       }
    }
 
@@ -715,20 +735,11 @@ static void check_proc_acpi_battery(const char * node, bool * have_battery,
 
    while (make_proc_acpi_key_val(&ptr, &key, &val))
    {
-      uint32_t key_hash = djb2_calculate(key);
+      char      *endptr = NULL;
 
-      switch (key_hash)
-      {
-         case ACPI_KEY_DESIGN_CAPACITY:
-            {
-               char  *endptr = NULL;
-               const int cvt = (int)strtol(val, &endptr, 10);
-
-               if (*endptr == ' ')
-                  maximum = cvt;
-            }
-            break;
-      }
+      if (string_is_equal(key, "design capacity"))
+         if (endptr && *endptr == ' ')
+            maximum = (int)strtol(val, &endptr, 10);
    }
 
    if ((maximum >= 0) && (remaining >= 0))
@@ -758,8 +769,8 @@ static void check_proc_acpi_battery(const char * node, bool * have_battery,
 
    if (choose)
    {
-      *seconds = secs;
-      *percent = pct;
+      *seconds  = secs;
+      *percent  = pct;
       *charging = charge;
    }
 
@@ -852,10 +863,9 @@ static void check_proc_acpi_ac_adapter(const char * node, bool *have_ac)
    ptr = &buf[0];
    while (make_proc_acpi_key_val(&ptr, &key, &val))
    {
-      uint32_t key_hash = djb2_calculate(key);
       uint32_t val_hash = djb2_calculate(val);
 
-      if (key_hash == ACPI_KEY_STATE &&
+      if (string_is_equal(key, "state") &&
             val_hash == ACPI_VAL_ONLINE)
          *have_ac = true;
    }
@@ -974,7 +984,7 @@ static bool frontend_unix_powerstate_check_apm(
 
    if (!next_string(&ptr, &str))     /* remaining battery life time units */
       goto error;
-   else if (string_is_equal_fast(str, "min", 3))
+   else if (string_is_equal(str, "min"))
       battery_time *= 60;
 
    if (battery_flag == 0xFF) /* unknown state */
@@ -1145,57 +1155,40 @@ static enum frontend_powerstate frontend_unix_get_powerstate(
    return ret;
 }
 
-#define UNIX_ARCH_X86_64     0x23dea434U
-#define UNIX_ARCH_X86        0x0b88b8cbU
-#define UNIX_ARCH_ARM        0x0b885ea5U
-#define UNIX_ARCH_PPC64      0x1028cf52U
-#define UNIX_ARCH_MIPS       0x7c9aa25eU
-#define UNIX_ARCH_TILE       0x7c9e7873U
-#define UNIX_ARCH_AARCH64    0x191bfc0eU
-#define UNIX_ARCH_ARMV7B     0xf27015f4U
-#define UNIX_ARCH_ARMV7L     0xf27015feU
-#define UNIX_ARCH_ARMV6L     0xf27015ddU
-#define UNIX_ARCH_ARMV6B     0xf27015d3U
-#define UNIX_ARCH_ARMV5TEB   0x28612995U
-#define UNIX_ARCH_ARMV5TEL   0x4ecca435U
-
 static enum frontend_architecture frontend_unix_get_architecture(void)
 {
    struct utsname buffer;
-   uint32_t buffer_hash   = 0;
    const char *val        = NULL;
 
    if (uname(&buffer) != 0)
       return FRONTEND_ARCH_NONE;
 
    val         = buffer.machine;
-   buffer_hash = djb2_calculate(val);
 
-   switch (buffer_hash)
-   {
-      case UNIX_ARCH_AARCH64:
-         return FRONTEND_ARCH_ARMV8;
-      case UNIX_ARCH_ARMV7L:
-      case UNIX_ARCH_ARMV7B:
-         return FRONTEND_ARCH_ARMV7;
-      case UNIX_ARCH_ARMV6L:
-      case UNIX_ARCH_ARMV6B:
-      case UNIX_ARCH_ARMV5TEB:
-      case UNIX_ARCH_ARMV5TEL:
-         return FRONTEND_ARCH_ARM;
-      case UNIX_ARCH_X86_64:
-         return FRONTEND_ARCH_X86_64;
-      case UNIX_ARCH_X86:
+   if (string_is_equal(val, "aarch64"))
+      return FRONTEND_ARCH_ARMV8;
+   else if (
+         string_is_equal(val, "armv7l") ||
+         string_is_equal(val, "armv7b")
+      )
+      return FRONTEND_ARCH_ARMV7;
+   else if (
+         string_is_equal(val, "armv6l") ||
+         string_is_equal(val, "armv6b") ||
+         string_is_equal(val, "armv5tel") ||
+         string_is_equal(val, "arm")
+      )
+      return FRONTEND_ARCH_ARM;
+   else if (string_is_equal(val, "x86_64"))
+      return FRONTEND_ARCH_X86_64;
+   else if (string_is_equal(val, "x86"))
          return FRONTEND_ARCH_X86;
-      case UNIX_ARCH_ARM:
-         return FRONTEND_ARCH_ARM;
-      case UNIX_ARCH_PPC64:
+   else if (string_is_equal(val, "ppc64"))
          return FRONTEND_ARCH_PPC;
-      case UNIX_ARCH_MIPS:
+   else if (string_is_equal(val, "mips"))
          return FRONTEND_ARCH_MIPS;
-      case UNIX_ARCH_TILE:
+   else if (string_is_equal(val, "tile"))
          return FRONTEND_ARCH_TILE;
-   }
 
    return FRONTEND_ARCH_NONE;
 }
@@ -1226,6 +1219,8 @@ static void frontend_unix_get_os(char *s,
    strlcpy(s, "DragonFly BSD", len);
 #elif defined(BSD)
    strlcpy(s, "BSD", len);
+#elif defined(__HAIKU__)
+   strlcpy(s, "Haiku", len);
 #else
    strlcpy(s, "Linux", len);
 #endif
@@ -1337,7 +1332,7 @@ static void frontend_unix_get_env(int *argc,
    if (android_app->getStringExtra && jstr)
    {
       const char *argv = (*env)->GetStringUTFChars(env, jstr, 0);
-      bool used        = string_is_equal_fast(argv, "false", 5) ? false : true;
+      bool used        = string_is_equal(argv, "false") ? false : true;
 
       (*env)->ReleaseStringUTFChars(env, jstr, argv);
 
@@ -2221,6 +2216,200 @@ static void frontend_unix_destroy_signal_handler_state(void)
    unix_sighandler_quit = 0;
 }
 
+/* To free change_data, call the function again with a NULL string_list while providing change_data again */
+static void frontend_unix_watch_path_for_changes(struct string_list *list, int flags, path_change_data_t **change_data)
+{
+#ifdef HAS_INOTIFY
+   int major = 0;
+   int minor = 0;
+   int inotify_mask = 0, fd = 0;
+   unsigned i, krel = 0;
+   struct utsname buffer;
+   inotify_data_t *inotify_data;
+
+   if (!list)
+   {
+      if (change_data && *change_data)
+      {
+         /* free the original data */
+         inotify_data = (inotify_data_t*)((*change_data)->data);
+
+         if (inotify_data->wd_list->count > 0)
+         {
+            for (i = 0; i < inotify_data->wd_list->count; i++)
+            {
+               inotify_rm_watch(inotify_data->fd, inotify_data->wd_list->data[i]);
+            }
+         }
+
+         int_vector_list_free(inotify_data->wd_list);
+         string_list_free(inotify_data->path_list);
+         close(inotify_data->fd);
+         free(inotify_data);
+         free(*change_data);
+         return;
+      }
+      else
+         return;
+   }
+   else if (list->size == 0)
+      return;
+   else
+      if (!change_data)
+         return;
+
+   if (uname(&buffer) != 0)
+   {
+      RARCH_WARN("watch_path_for_changes: Failed to get current kernel version.\n");
+      return;
+   }
+
+   /* get_os doesn't provide all three */
+   sscanf(buffer.release, "%d.%d.%u", &major, &minor, &krel);
+
+   /* check if we are actually running on a high enough kernel version as well */
+   if (major < 2)
+   {
+      RARCH_WARN("watch_path_for_changes: inotify unsupported on this kernel version (%d.%d.%u).\n", major, minor, krel);
+      return;
+   }
+   else if (major == 2)
+   {
+      if (minor < 6)
+      {
+         RARCH_WARN("watch_path_for_changes: inotify unsupported on this kernel version (%d.%d.%u).\n", major, minor, krel);
+         return;
+      }
+      else if (minor == 6)
+      {
+         if (krel < 13)
+         {
+            RARCH_WARN("watch_path_for_changes: inotify unsupported on this kernel version (%d.%d.%u).\n", major, minor, krel);
+            return;
+         }
+         else
+         {
+            /* anything >= 2.6.13 is supported */
+         }
+      }
+      else
+      {
+         /* anything >= 2.7 is supported */
+      }
+   }
+   else
+   {
+      /* anything >= 3 is supported */
+   }
+
+   fd = inotify_init();
+
+   if (fd < 0)
+   {
+      RARCH_WARN("watch_path_for_changes: Could not initialize inotify.\n");
+      return;
+   }
+
+   if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK))
+   {
+      RARCH_WARN("watch_path_for_changes: Could not set socket to non-blocking.\n");
+      return;
+   }
+
+   inotify_data = (inotify_data_t*)calloc(1, sizeof(*inotify_data));
+   inotify_data->fd = fd;
+
+   inotify_data->wd_list = int_vector_list_new();
+   inotify_data->path_list = string_list_new();
+
+   /* handle other flags here as new ones are added */
+   if (flags & PATH_CHANGE_TYPE_MODIFIED)
+      inotify_mask |= IN_MODIFY;
+   if (flags & PATH_CHANGE_TYPE_WRITE_FILE_CLOSED)
+      inotify_mask |= IN_CLOSE_WRITE;
+   if (flags & PATH_CHANGE_TYPE_FILE_MOVED)
+      inotify_mask |= IN_MOVE_SELF;
+   if (flags & PATH_CHANGE_TYPE_FILE_DELETED)
+      inotify_mask |= IN_DELETE_SELF;
+
+   inotify_data->flags = inotify_mask;
+
+   for (i = 0; i < list->size; i++)
+   {
+      int wd = inotify_add_watch(fd, list->elems[i].data, inotify_mask);
+      union string_list_elem_attr attr = {0};
+
+      RARCH_LOG("Watching file for changes: %s\n", list->elems[i].data);
+
+      int_vector_list_append(inotify_data->wd_list, wd);
+      string_list_append(inotify_data->path_list, list->elems[i].data, attr);
+   }
+
+   *change_data = (path_change_data_t*)calloc(1, sizeof(path_change_data_t));
+   (*change_data)->data = inotify_data;
+#endif
+}
+
+static bool frontend_unix_check_for_path_changes(path_change_data_t *change_data)
+{
+#ifdef HAS_INOTIFY
+   inotify_data_t *inotify_data = (inotify_data_t*)(change_data->data);
+   char buffer[INOTIFY_BUF_LEN] = {0};
+   int length, i = 0;
+
+   while ((length = read(inotify_data->fd, buffer, INOTIFY_BUF_LEN)) > 0)
+   {
+      i = 0;
+
+      while (i < length && i < sizeof(buffer))
+      {
+         struct inotify_event *event = (struct inotify_event *)&buffer[i];
+
+         if (event->mask & inotify_data->flags)
+         {
+            unsigned j;
+
+            /* A successful close does not guarantee that the 
+             * data has been successfully saved to disk, 
+             * as the kernel defers writes. It is 
+             * not common for a file system to flush 
+             * the buffers when the stream is closed.
+             *
+             * So we manually fsync() here to flush the data 
+             * to disk, to make sure that the new data is 
+             * immediately available when the file is re-read.
+             */
+            for (j = 0; j < inotify_data->wd_list->count; j++)
+            {
+               if (inotify_data->wd_list->data[j] == event->wd)
+               {
+                  /* found the right file, now sync it */
+                  const char *path = inotify_data->path_list->elems[j].data;
+                  FILE         *fp = (FILE*)fopen_utf8(path, "rb");
+
+                  RARCH_LOG("file change detected: %s\n", path);
+
+                  if (fp)
+                  {
+                     fsync(fileno(fp));
+                     fclose(fp);
+                  }
+               }
+            }
+
+            return true;
+         }
+
+         i += sizeof(struct inotify_event) + event->len;
+      }
+   }
+
+   return false;
+#else
+   return false;
+#endif
+}
+
 frontend_ctx_driver_t frontend_ctx_unix = {
    frontend_unix_get_env,       /* environment_get */
    frontend_unix_init,          /* init */
@@ -2262,6 +2451,8 @@ frontend_ctx_driver_t frontend_ctx_unix = {
 #ifdef HAVE_LAKKA
    frontend_unix_get_lakka_version,    /* get_lakka_version */
 #endif
+   frontend_unix_watch_path_for_changes,
+   frontend_unix_check_for_path_changes,
 #ifdef ANDROID
    "android"
 #else

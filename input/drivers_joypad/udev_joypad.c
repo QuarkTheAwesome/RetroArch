@@ -151,6 +151,7 @@ static int udev_add_pad(struct udev_device *dev, unsigned p, int fd, const char 
    unsigned axes                        = 0;
    struct udev_device *parent           = NULL;
    struct udev_joypad *pad              = (struct udev_joypad*)&udev_pads[p];
+   struct input_id inputid              = {0};
    unsigned long keybit[NBITS(KEY_MAX)] = {0};
    unsigned long absbit[NBITS(ABS_MAX)] = {0};
    unsigned long ffbit[NBITS(FF_MAX)]   = {0};
@@ -163,16 +164,12 @@ static int udev_add_pad(struct udev_device *dev, unsigned p, int fd, const char 
       return -1;
    }
 
-   /* Don't worry about unref'ing the parent. */
-   parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device");
-
    pad->vid = pad->pid = 0;
 
-   if ((buf = udev_device_get_sysattr_value(parent, "idVendor")) != NULL)
-      pad->vid = strtol(buf, NULL, 16);
-
-   if ((buf = udev_device_get_sysattr_value(parent, "idProduct")) != NULL)
-      pad->pid = strtol(buf, NULL, 16);
+   if (ioctl(fd, EVIOCGID, &inputid) >= 0) {
+      pad->vid = inputid.vendor;
+      pad->pid = inputid.product;
+   }
 
    RARCH_LOG("[udev]: Plugged pad: %s (%u:%u) on port #%u.\n",
              pad->ident, pad->vid, pad->pid, p);
@@ -449,14 +446,14 @@ static void udev_joypad_poll(void)
          const char *action  = udev_device_get_action(dev);
          const char *devnode = udev_device_get_devnode(dev);
 
-         if (val && string_is_equal_fast(val, "1", 1) && devnode)
+         if (val && string_is_equal(val, "1") && devnode)
          {
-            if (string_is_equal_fast(action, "add", 3))
+            if (string_is_equal(action, "add"))
             {
                RARCH_LOG("[udev]: Hotplug add: %s.\n", devnode);
                udev_check_device(dev, devnode);
             }
-            else if (string_is_equal_fast(action, "remove", 6))
+            else if (string_is_equal(action, "remove"))
             {
                RARCH_LOG("[udev]: Hotplug remove: %s.\n", devnode);
                udev_joypad_remove_device(devnode);
@@ -640,9 +637,11 @@ static bool udev_joypad_button(unsigned port, uint16_t joykey)
    return joykey < UDEV_NUM_BUTTONS && BIT64_GET(pad->buttons, joykey);
 }
 
-static void udev_joypad_get_buttons(unsigned port, retro_bits_t *state)
+static void udev_joypad_get_buttons(unsigned port, input_bits_t *state)
 {
-	const struct udev_joypad *pad = (const struct udev_joypad*)&udev_pads[port];
+	const struct udev_joypad *pad = (const struct udev_joypad*)
+      &udev_pads[port];
+
 	if (pad)
    {
 		BITS_COPY16_PTR( state, pad->buttons );

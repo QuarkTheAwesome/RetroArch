@@ -21,75 +21,15 @@
 #include <compat/strl.h>
 #include <retro_endianness.h>
 #include <file/file_path.h>
+#include <lists/string_list.h>
+#include <lists/dir_list.h>
 #include <string/stdstring.h>
 
 #include "libretro-db/libretrodb.h"
 
-#include "list_special.h"
+#include "core_info.h"
 #include "database_info.h"
-#include "msg_hash.h"
 #include "verbosity.h"
-
-#define DB_CURSOR_ROM_NAME                      0x16bbcf13U
-#define DB_CURSOR_NAME                          0x7c9b0c46U
-#define DB_CURSOR_DESCRIPTION                   0x91b0c789U
-#define DB_CURSOR_GENRE                         0x0f802156U
-#define DB_CURSOR_PUBLISHER                     0x5e099013U
-#define DB_CURSOR_DEVELOPER                     0x1783d2abU
-#define DB_CURSOR_ORIGIN                        0x1315e3edU
-#define DB_CURSOR_FRANCHISE                     0xc3a526b8U
-#define DB_CURSOR_BBFC_RATING                   0xede26836U
-#define DB_CURSOR_ESRB_RATING                   0x4c3fa255U
-#define DB_CURSOR_ELSPA_RATING                  0xd9cab41eU
-#define DB_CURSOR_CERO_RATING                   0x084a1772U
-#define DB_CURSOR_PEGI_RATING                   0x431b736eU
-#define DB_CURSOR_CHECKSUM_CRC32                0x0b88671dU
-#define DB_CURSOR_CHECKSUM_SHA1                 0x7c9de632U
-#define DB_CURSOR_CHECKSUM_MD5                  0x0b888fabU
-#define DB_CURSOR_ENHANCEMENT_HW                0xab612029U
-#define DB_CURSOR_EDGE_MAGAZINE_REVIEW          0xd3573eabU
-#define DB_CURSOR_EDGE_MAGAZINE_RATING          0xd30dc4feU
-#define DB_CURSOR_EDGE_MAGAZINE_ISSUE           0xa0f30d42U
-#define DB_CURSOR_FAMITSU_MAGAZINE_RATING       0x0a50ca62U
-#define DB_CURSOR_TGDB_RATING                   0x8d61458aU
-#define DB_CURSOR_MAX_USERS                     0x1084ff77U
-#define DB_CURSOR_RELEASEDATE_MONTH             0x790ad76cU
-#define DB_CURSOR_RELEASEDATE_YEAR              0x7fd06ed7U
-#define DB_CURSOR_RUMBLE_SUPPORTED              0x1a4dc3ecU
-#define DB_CURSOR_COOP_SUPPORTED                0x7c953ff6U
-#define DB_CURSOR_ANALOG_SUPPORTED              0xf220fc17U
-#define DB_CURSOR_SIZE                          0x7c9dede0U
-#define DB_CURSOR_SERIAL                        0x1b843ec5U
-
-static void database_info_build_query_add_quote(char *s, size_t len)
-{
-   strlcat(s, "\"", len);
-}
-
-static void database_info_build_query_add_bracket_open(char *s, size_t len)
-{
-   strlcat(s, "{'", len);
-}
-
-static void database_info_build_query_add_bracket_close(char *s, size_t len)
-{
-   strlcat(s, "}", len);
-}
-
-static void database_info_build_query_add_colon(char *s, size_t len)
-{
-   strlcat(s, "':", len);
-}
-
-static void database_info_build_query_add_glob_open(char *s, size_t len)
-{
-   strlcat(s, "glob('*", len);
-}
-
-static void database_info_build_query_add_glob_close(char *s, size_t len)
-{
-   strlcat(s, "*')", len);
-}
 
 int database_info_build_query_enum(char *s, size_t len,
       enum database_query_type type,
@@ -98,7 +38,8 @@ int database_info_build_query_enum(char *s, size_t len,
    bool add_quotes = true;
    bool add_glob   = false;
 
-   database_info_build_query_add_bracket_open(s, len);
+   string_add_bracket_open(s, len);
+   string_add_single_quote(s, len);
 
    switch (type)
    {
@@ -169,17 +110,19 @@ int database_info_build_query_enum(char *s, size_t len,
          break;
    }
 
-   database_info_build_query_add_colon(s, len);
+   string_add_single_quote(s, len);
+   string_add_colon(s, len);
    if (add_glob)
-      database_info_build_query_add_glob_open(s, len);
+      string_add_glob_open(s, len);
    if (add_quotes)
-      database_info_build_query_add_quote(s, len);
+      string_add_quote(s, len);
    strlcat(s, path, len);
    if (add_glob)
-      database_info_build_query_add_glob_close(s, len);
+      string_add_glob_close(s, len);
    if (add_quotes)
-      database_info_build_query_add_quote(s, len);
-   database_info_build_query_add_bracket_close(s, len);
+      string_add_quote(s, len);
+
+   string_add_bracket_close(s, len);
 
 #if 0
    RARCH_LOG("query: %s\n", s);
@@ -228,7 +171,6 @@ static int database_cursor_iterate(libretrodb_cursor_t *cur,
 
    for (i = 0; i < item.val.map.len; i++)
    {
-      uint32_t                 value = 0;
       struct rmsgpack_dom_value *key = &item.val.map.items[i].key;
       struct rmsgpack_dom_value *val = &item.val.map.items[i].value;
       const char *val_string         = NULL;
@@ -236,121 +178,123 @@ static int database_cursor_iterate(libretrodb_cursor_t *cur,
       if (!key || !val)
          continue;
 
-      val_string = val->val.string.buff;
-      str        = key->val.string.buff;
-      value      = msg_hash_calculate(str);
+      val_string                     = val->val.string.buff;
+      str                            = key->val.string.buff;
 
-      switch (value)
+      if (string_is_equal(str, "publisher"))
       {
-         case DB_CURSOR_SERIAL:
-            if (!string_is_empty(val_string))
-               db_info->serial = strdup(val_string);
-            break;
-         case DB_CURSOR_ROM_NAME:
-            if (!string_is_empty(val_string))
-               db_info->rom_name = strdup(val_string);
-            break;
-         case DB_CURSOR_NAME:
-            if (!string_is_empty(val_string))
-               db_info->name = strdup(val_string);
-            break;
-         case DB_CURSOR_DESCRIPTION:
-            if (!string_is_empty(val_string))
-               db_info->description = strdup(val_string);
-            break;
-         case DB_CURSOR_GENRE:
-            if (!string_is_empty(val_string))
-               db_info->genre = strdup(val_string);
-            break;
-         case DB_CURSOR_PUBLISHER:
-            if (!string_is_empty(val_string))
-               db_info->publisher = strdup(val_string);
-            break;
-         case DB_CURSOR_DEVELOPER:
-            if (!string_is_empty(val_string))
-               db_info->developer = string_split(val_string, "|");
-            break;
-         case DB_CURSOR_ORIGIN:
-            if (!string_is_empty(val_string))
-               db_info->origin = strdup(val_string);
-            break;
-         case DB_CURSOR_FRANCHISE:
-            if (!string_is_empty(val_string))
-               db_info->franchise = strdup(val_string);
-            break;
-         case DB_CURSOR_BBFC_RATING:
-            if (!string_is_empty(val_string))
-               db_info->bbfc_rating = strdup(val_string);
-            break;
-         case DB_CURSOR_ESRB_RATING:
-            if (!string_is_empty(val_string))
-               db_info->esrb_rating = strdup(val_string);
-            break;
-         case DB_CURSOR_ELSPA_RATING:
-            if (!string_is_empty(val_string))
-               db_info->elspa_rating = strdup(val_string);
-            break;
-         case DB_CURSOR_CERO_RATING:
-            if (!string_is_empty(val_string))
-               db_info->cero_rating          = strdup(val_string);
-            break;
-         case DB_CURSOR_PEGI_RATING:
-            if (!string_is_empty(val_string))
-               db_info->pegi_rating          = strdup(val_string);
-            break;
-         case DB_CURSOR_ENHANCEMENT_HW:
-            if (!string_is_empty(val_string))
-               db_info->enhancement_hw       = strdup(val_string);
-            break;
-         case DB_CURSOR_EDGE_MAGAZINE_REVIEW:
-            if (!string_is_empty(val_string))
-               db_info->edge_magazine_review = strdup(val_string);
-            break;
-         case DB_CURSOR_EDGE_MAGAZINE_RATING:
-            db_info->edge_magazine_rating    = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_EDGE_MAGAZINE_ISSUE:
-            db_info->edge_magazine_issue     = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_FAMITSU_MAGAZINE_RATING:
-            db_info->famitsu_magazine_rating = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_TGDB_RATING:
-            db_info->tgdb_rating             = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_MAX_USERS:
-            db_info->max_users               = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_RELEASEDATE_MONTH:
-            db_info->releasemonth            = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_RELEASEDATE_YEAR:
-            db_info->releaseyear             = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_RUMBLE_SUPPORTED:
-            db_info->rumble_supported        = (int)val->val.uint_;
-            break;
-         case DB_CURSOR_COOP_SUPPORTED:
-            db_info->coop_supported          = (int)val->val.uint_;
-            break;
-         case DB_CURSOR_ANALOG_SUPPORTED:
-            db_info->analog_supported        = (int)val->val.uint_;
-            break;
-         case DB_CURSOR_SIZE:
-            db_info->size                    = (unsigned)val->val.uint_;
-            break;
-         case DB_CURSOR_CHECKSUM_CRC32:
-            db_info->crc32 = swap_if_little32(*(uint32_t*)val->val.binary.buff);
-            break;
-         case DB_CURSOR_CHECKSUM_SHA1:
-            db_info->sha1 = bin_to_hex_alloc((uint8_t*)val->val.binary.buff, val->val.binary.len);
-            break;
-         case DB_CURSOR_CHECKSUM_MD5:
-            db_info->md5 = bin_to_hex_alloc((uint8_t*)val->val.binary.buff, val->val.binary.len);
-            break;
-         default:
-            RARCH_LOG("Unknown key: %s\n", str);
-            break;
+         if (!string_is_empty(val_string))
+            db_info->publisher = strdup(val_string);
+      }
+      else if (string_is_equal(str, "developer"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->developer = string_split(val_string, "|");
+      }
+      else if (string_is_equal(str, "serial"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->serial = strdup(val_string);
+      }
+      else if (string_is_equal(str, "rom_name"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->rom_name = strdup(val_string);
+      }
+      else if (string_is_equal(str, "name"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->name = strdup(val_string);
+      }
+      else if (string_is_equal(str, "description"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->description = strdup(val_string);
+      }
+      else if (string_is_equal(str, "genre"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->genre = strdup(val_string);
+      }
+      else if (string_is_equal(str, "origin"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->origin = strdup(val_string);
+      }
+      else if (string_is_equal(str, "franchise"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->franchise = strdup(val_string);
+      }
+      else if (string_is_equal(str, "bbfc_rating"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->bbfc_rating = strdup(val_string);
+      }
+      else if (string_is_equal(str, "esrb_rating"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->esrb_rating = strdup(val_string);
+      }
+      else if (string_is_equal(str, "elspa_rating"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->elspa_rating = strdup(val_string);
+      }
+      else if (string_is_equal(str, "cero_rating"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->cero_rating          = strdup(val_string);
+      }
+      else if (string_is_equal(str, "pegi_rating"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->pegi_rating          = strdup(val_string);
+      }
+      else if (string_is_equal(str, "enhancement_hw"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->enhancement_hw       = strdup(val_string);
+      }
+      else if (string_is_equal(str, "edge_review"))
+      {
+         if (!string_is_empty(val_string))
+            db_info->edge_magazine_review = strdup(val_string);
+      }
+      else if (string_is_equal(str, "edge_rating"))
+         db_info->edge_magazine_rating    = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "edge_issue"))
+         db_info->edge_magazine_issue     = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "famitsu_rating"))
+         db_info->famitsu_magazine_rating = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "tgdb_rating"))
+         db_info->tgdb_rating             = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "users"))
+         db_info->max_users               = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "releasemonth"))
+         db_info->releasemonth            = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "releaseyear"))
+         db_info->releaseyear             = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "rumble"))
+         db_info->rumble_supported        = (int)val->val.uint_;
+      else if (string_is_equal(str, "coop"))
+         db_info->coop_supported          = (int)val->val.uint_;
+      else if (string_is_equal(str, "analog"))
+         db_info->analog_supported        = (int)val->val.uint_;
+      else if (string_is_equal(str, "size"))
+         db_info->size                    = (unsigned)val->val.uint_;
+      else if (string_is_equal(str, "crc"))
+         db_info->crc32 = swap_if_little32(
+               *(uint32_t*)val->val.binary.buff);
+      else if (string_is_equal(str, "sha1"))
+         db_info->sha1 = bin_to_hex_alloc(
+               (uint8_t*)val->val.binary.buff, val->val.binary.len);
+      else if (string_is_equal(str, "md5"))
+         db_info->md5 = bin_to_hex_alloc(
+               (uint8_t*)val->val.binary.buff, val->val.binary.len);
+      else
+      {
+         RARCH_LOG("Unknown key: %s\n", str);
       }
    }
 
@@ -398,22 +342,22 @@ static int database_cursor_close(libretrodb_t *db, libretrodb_cursor_t *cur)
    return 0;
 }
 
-static bool type_is_prioritized(enum msg_file_type type)
+static bool type_is_prioritized(const char *path)
 {
-   return (type == FILE_TYPE_CUE || type == FILE_TYPE_GDI);
-}
-
-static enum msg_file_type file_type(const char *path)
-{
-   return msg_hash_to_file_type(msg_hash_calculate(path_get_extension(path)));
+   const char *ext = path_get_extension(path);
+   if (string_is_equal_noncase(ext, "cue"))
+      return true;
+   if (string_is_equal_noncase(ext, "gdi"))
+      return true;
+   return false;
 }
 
 static int dir_entry_compare(const void *left, const void *right)
 {
    const struct string_list_elem *le = (const struct string_list_elem*)left;
    const struct string_list_elem *re = (const struct string_list_elem*)right;
-   bool                            l = type_is_prioritized(file_type(le->data));
-   bool                            r = type_is_prioritized(file_type(re->data));
+   bool                            l = type_is_prioritized(le->data);
+   bool                            r = type_is_prioritized(re->data);
 
    return (int) r - (int) l;
 }
@@ -424,37 +368,44 @@ static void dir_list_prioritize(struct string_list *list)
 }
 
 database_info_handle_t *database_info_dir_init(const char *dir,
-      enum database_type type, retro_task_t *task)
+      enum database_type type, retro_task_t *task,
+      bool show_hidden_files)
 {
-   database_info_handle_t     *db  = (database_info_handle_t*)
+   core_info_list_t *core_info_list = NULL;
+   struct string_list       *list   = NULL;
+   database_info_handle_t     *db   = (database_info_handle_t*)
       calloc(1, sizeof(*db));
 
    if (!db)
       return NULL;
 
-   db->list           = dir_list_new_special(dir, DIR_LIST_RECURSIVE, NULL);
+   core_info_get_list(&core_info_list);
 
-   if (!db->list)
-      goto error;
+   list = dir_list_new(dir, core_info_list->all_ext,
+         false, show_hidden_files,
+         false, true);
 
-   dir_list_prioritize(db->list);
+   if (!list)
+   {
+      free(db);
+      return NULL;
+   }
 
+   dir_list_prioritize(list);
+
+   db->list           = list;
    db->list_ptr       = 0;
    db->status         = DATABASE_STATUS_ITERATE;
    db->type           = type;
 
    return db;
-
-error:
-   if (db)
-      free(db);
-   return NULL;
 }
 
 database_info_handle_t *database_info_file_init(const char *path,
       enum database_type type, retro_task_t *task)
 {
    union string_list_elem_attr attr;
+   struct string_list        *list  = NULL;
    database_info_handle_t      *db  = (database_info_handle_t*)
       calloc(1, sizeof(*db));
 
@@ -463,23 +414,22 @@ database_info_handle_t *database_info_file_init(const char *path,
 
    attr.i             = 0;
 
-   db->list           = string_list_new();
+   list               = string_list_new();
 
-   if (!db->list)
-      goto error;
+   if (!list)
+   {
+      free(db);
+      return NULL;
+   }
 
-   string_list_append(db->list, path, attr);
+   string_list_append(list, path, attr);
 
    db->list_ptr       = 0;
+   db->list           = list;
    db->status         = DATABASE_STATUS_ITERATE;
    db->type           = type;
 
    return db;
-
-error:
-   if (db)
-      free(db);
-   return NULL;
 }
 
 void database_info_free(database_info_handle_t *db)

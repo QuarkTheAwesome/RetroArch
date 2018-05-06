@@ -37,6 +37,7 @@
 #endif
 
 #include <string/stdstring.h>
+#include <X11/Xatom.h>
 
 #include "../../configuration.h"
 #include "../../frontend/frontend_driver.h"
@@ -113,7 +114,17 @@ static enum gfx_ctx_api x_api                 = GFX_CTX_NONE;
 
 static gfx_ctx_x_data_t *current_context_data = NULL;
 
-const unsigned long retroarch_icon_data[] = {
+typedef struct Hints
+{
+   unsigned long flags;
+   unsigned long functions;
+   unsigned long decorations;
+   long          inputMode;
+   unsigned long status;
+} Hints;
+
+/* We use long because X11 wants 32-bit pixels for 32-bit systems and 64 for 64... */
+static const unsigned long retroarch_icon_data[] = {
    16, 16,
    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
@@ -445,6 +456,7 @@ static bool gfx_ctx_x_set_resize(void *data,
             if (!vulkan_create_swapchain(&x->vk, width, height, x->g_interval))
             {
                RARCH_ERR("[X/Vulkan]: Failed to update swapchain.\n");
+               x->vk.swapchain = VK_NULL_HANDLE;
                return false;
             }
 
@@ -459,7 +471,7 @@ static bool gfx_ctx_x_set_resize(void *data,
       default:
          break;
    }
-   return false;
+   return true;
 }
 
 static void *gfx_ctx_x_init(video_frame_info_t *video_info, void *data)
@@ -620,10 +632,10 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    int y_off                 = 0;
    XVisualInfo *vi           = NULL;
    XSetWindowAttributes swa  = {0};
+   char *wm_name             = NULL;
    int (*old_handler)(Display*, XErrorEvent*) = NULL;
    gfx_ctx_x_data_t *x       = (gfx_ctx_x_data_t*)data;
    Atom net_wm_icon = XInternAtom(g_x11_dpy, "_NET_WM_ICON", False);
-   Atom net_wm_opacity = XInternAtom(g_x11_dpy, "_NET_WM_WINDOW_OPACITY", False);
    Atom cardinal = XInternAtom(g_x11_dpy, "CARDINAL", False);
    settings_t *settings = config_get_ptr();
    unsigned opacity = settings->uints.video_window_opacity * ((unsigned)-1 / 100.0);
@@ -668,7 +680,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    swa.event_mask = StructureNotifyMask | KeyPressMask | KeyReleaseMask |
       LeaveWindowMask | EnterWindowMask |
       ButtonReleaseMask | ButtonPressMask;
-   swa.override_redirect = fullscreen ? True : False;
+   swa.override_redirect = False;
 
    if (fullscreen && !windowed_full)
    {
@@ -680,6 +692,21 @@ static bool gfx_ctx_x_set_video_mode(void *data,
       else
          RARCH_ERR("[GLX]: Entering true fullscreen failed. Will attempt windowed mode.\n");
    }
+
+   wm_name = x11_get_wm_name(g_x11_dpy);
+   if (wm_name)
+   {
+      RARCH_LOG("[GLX]: Window manager is %s.\n", wm_name);
+
+      if (true_full && strcasestr(wm_name, "xfwm"))
+      {
+         RARCH_LOG("[GLX]: Using override-redirect workaround.\n");
+         swa.override_redirect = True;
+      }
+      free(wm_name);
+   }
+   if (!x11_has_net_wm_fullscreen(g_x11_dpy) && true_full)
+      swa.override_redirect = True;
 
    if (video_info->monitor_index)
       g_x11_screen = video_info->monitor_index - 1;
@@ -710,14 +737,39 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    g_x11_win = XCreateWindow(g_x11_dpy, RootWindow(g_x11_dpy, vi->screen),
          x_off, y_off, width, height, 0,
          vi->depth, InputOutput, vi->visual,
-         CWBorderPixel | CWColormap | CWEventMask |
-         (true_full ? CWOverrideRedirect : 0), &swa);
+         CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect,
+         &swa);
    XSetWindowBackground(g_x11_dpy, g_x11_win, 0);
 
    XChangeProperty(g_x11_dpy, g_x11_win, net_wm_icon, cardinal, 32, PropModeReplace, (const unsigned char*)retroarch_icon_data, sizeof(retroarch_icon_data) / sizeof(*retroarch_icon_data));
 
+   if (fullscreen && settings->bools.video_disable_composition)
+   {
+      uint32_t value = 1;
+      Atom net_wm_bypass_compositor = XInternAtom(g_x11_dpy, "_NET_WM_BYPASS_COMPOSITOR", False);
+
+      RARCH_LOG("[GLX]: Requesting compositor bypass.\n");
+      XChangeProperty(g_x11_dpy, g_x11_win, net_wm_bypass_compositor, cardinal, 32, PropModeReplace, (const unsigned char*)&value, 1);
+   }
+
    if (opacity < (unsigned)-1)
+   {
+      Atom net_wm_opacity = XInternAtom(g_x11_dpy, "_NET_WM_WINDOW_OPACITY", False);
       XChangeProperty(g_x11_dpy, g_x11_win, net_wm_opacity, cardinal, 32, PropModeReplace, (const unsigned char*)&opacity, 1);
+   }
+
+   if (!settings->bools.video_window_show_decorations)
+   {
+      /* We could have just set _NET_WM_WINDOW_TYPE_DOCK instead, but that removes the window from any taskbar/panel,
+       * so we are forced to use the old motif hints method. */
+      Hints hints;
+      Atom property = XInternAtom(g_x11_dpy, "_MOTIF_WM_HINTS", False);
+
+      hints.flags = 2;
+      hints.decorations = 0;
+
+      XChangeProperty(g_x11_dpy, g_x11_win, property, property, 32, PropModeReplace, (const unsigned char*)&hints, 5);
+   }
 
    switch (x_api)
    {
@@ -743,6 +795,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    {
       RARCH_LOG("[GLX]: Using true fullscreen.\n");
       XMapRaised(g_x11_dpy, g_x11_win);
+      x11_set_net_wm_fullscreen(g_x11_dpy, g_x11_win);
    }
    else if (fullscreen)
    {
@@ -757,7 +810,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
        * x_off and y_off usually get ignored in XCreateWindow().
        */
       x11_move_window(g_x11_dpy, g_x11_win, x_off, y_off, width, height);
-      x11_windowed_fullscreen(g_x11_dpy, g_x11_win);
+      x11_set_net_wm_fullscreen(g_x11_dpy, g_x11_win);
    }
    else
    {
@@ -965,7 +1018,7 @@ static void gfx_ctx_x_input_driver(void *data,
 #ifdef HAVE_UDEV
    settings_t *settings = config_get_ptr();
 
-   if (string_is_equal_fast(settings->arrays.input_driver, "udev", 5))
+   if (string_is_equal(settings->arrays.input_driver, "udev"))
    {
       *input_data = input_udev.init(joypad_name);
       if (*input_data)
@@ -1016,6 +1069,11 @@ static gfx_ctx_proc_t gfx_ctx_x_get_proc_address(const char *symbol)
    }
 
    return NULL;
+}
+
+static enum gfx_ctx_api gfx_ctx_x_get_api(void *data)
+{
+   return x_api;
 }
 
 static bool gfx_ctx_x_bind_api(void *data, enum gfx_ctx_api api,
@@ -1162,10 +1220,12 @@ static void gfx_ctx_x_make_current(bool release)
 const gfx_ctx_driver_t gfx_ctx_x = {
    gfx_ctx_x_init,
    gfx_ctx_x_destroy,
+   gfx_ctx_x_get_api,
    gfx_ctx_x_bind_api,
    gfx_ctx_x_swap_interval,
    gfx_ctx_x_set_video_mode,
    x11_get_video_size,
+   x11_get_refresh_rate,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */

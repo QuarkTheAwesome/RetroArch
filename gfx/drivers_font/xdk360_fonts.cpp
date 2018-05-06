@@ -23,9 +23,19 @@
 
 #include "../drivers/d3d.h"
 #include "../common/d3d_common.h"
+#include "../common/d3d9_common.h"
 #include "../font_driver.h"
 
 #include "../drivers/d3d_shaders/font.hlsl.d3d9.h"
+
+#define XPR0_MAGIC_VALUE 0x30525058
+#define XPR1_MAGIC_VALUE 0x31525058
+#define XPR2_MAGIC_VALUE 0x58505232
+
+#define FONT_SCALE(d3d) ((d3d->resolution_hd_enable) ? 2 : 1)
+#define CALCFONTFILEHEADERSIZE(x) ( sizeof(uint32_t) + (sizeof(float)* 4) + sizeof(uint16_t) + (sizeof(wchar_t)*(x)) )
+#define FONTFILEVERSION 5
+
 
 #ifdef _XBOX360
 struct XPR_HEADER
@@ -39,15 +49,10 @@ struct XPR_HEADER
 /* structure member offsets matter */
 struct XBRESOURCE
 {
-#if defined(_XBOX1)
-   char *strName;
-   DWORD dwOffset;
-#elif defined(_XBOX360)
    DWORD dwType;
    DWORD dwOffset;
    DWORD dwSize;
    char *strName;
-#endif
 };
 
 enum
@@ -70,236 +75,110 @@ class PackedResource
 
       XBRESOURCE* m_pResourceTags;     /* Tags to associate names with the resources */
       DWORD       m_dwNumResourceTags; /* Number of resource tags */
-      BOOL m_bInitialized;             /* Resource is fully initialized */
 
    public:
       /* Loads the resources out of the specified bundle */
-#if defined(_XBOX1)
-      HRESULT Create( const char *strFilename, DWORD dwNumResourceTags = 0L, 
-            XBRESOURCE* pResourceTags = NULL );
-#elif defined(_XBOX360)
-      HRESULT Create( const char * strFilename );
-#endif
+      HRESULT Create(const char *strFilename, DWORD dwNumResourceTags, 
+            void *pResourceTags);
 
       void Destroy();
 
-      BOOL    Initialized() const;
-
-#ifdef _XBOX360
-      /* Retrieves the resource tags */
-      void GetResourceTags( DWORD* pdwNumResourceTags, XBRESOURCE** ppResourceTags );
-#endif
-
-      /* Helper function to make sure a resource is registered */
-      LPDIRECT3DRESOURCE RegisterResource( LPDIRECT3DRESOURCE pResource ) const
-      {
-#ifdef _XBOX1
-         /* Register the resource, if it has not yet been registered. We mark
-          * a resource as registered by upping it's reference count. */
-         if( pResource && ( pResource->Common & D3DCOMMON_REFCOUNT_MASK ) == 1 )
-         {
-            /* Special case CPU-copy push buffers (which live in system memory) */
-            if( ( pResource->Common & D3DCOMMON_TYPE_PUSHBUFFER ) &&
-                  ( pResource->Common & D3DPUSHBUFFER_RUN_USING_CPU_COPY ) )
-               pResource->Data += (DWORD)m_pSysMemData;
-            else
-               pResource->Register( m_pVidMemData );
-
-            pResource->AddRef();
-         }
-#endif
-         return pResource;
-      }
-
-      /* Functions to retrieve resources by their offset */
-      void *GetData( DWORD dwOffset ) const
-      { return &m_pSysMemData[dwOffset]; }
-
-      LPDIRECT3DRESOURCE GetResource( DWORD dwOffset ) const
-      { return RegisterResource( (LPDIRECT3DRESOURCE)GetData(dwOffset) ); }
-
-      LPDIRECT3DTEXTURE GetTexture( DWORD dwOffset ) const
-      { return (LPDIRECT3DTEXTURE)GetResource( dwOffset ); }
-
-      LPDIRECT3DVERTEXBUFFER GetVertexBuffer( DWORD dwOffset ) const
-      { return (LPDIRECT3DVERTEXBUFFER)GetResource( dwOffset ); }
+      BOOL m_bInitialized;             /* Resource is fully initialized */
 
       /* Functions to retrieve resources by their name */
-      void *GetData( const char* strName ) const;
-
-      LPDIRECT3DRESOURCE GetResource( const char* strName ) const
-      { return RegisterResource( (LPDIRECT3DRESOURCE)GetData( strName ) ); }
-
-      LPDIRECT3DTEXTURE GetTexture( const char* strName ) const
-      { return (LPDIRECT3DTEXTURE)GetResource( strName ); }
-
-      LPDIRECT3DVERTEXBUFFER GetVertexBuffer( const char* strName ) const
-      { return (LPDIRECT3DVERTEXBUFFER)GetResource( strName ); }
+      void *GetData( const char* strName );
+      LPDIRECT3DTEXTURE9 *GetTexture(const char* strName);
 
       /* Constructor/destructor */
       PackedResource();
       ~PackedResource();
 };
 
-#define XPR0_MAGIC_VALUE 0x30525058
-#define XPR1_MAGIC_VALUE 0x31525058
-#define XPR2_MAGIC_VALUE 0x58505232
+LPDIRECT3DTEXTURE9 *PackedResource::GetTexture(const char* strName)
+{ 
+   LPDIRECT3DRESOURCE9 pResource = (LPDIRECT3DRESOURCE9)GetData(strName);
+   return (LPDIRECT3DTEXTURE9)pResource;
+}
 
 PackedResource::PackedResource()
 {
-   m_pSysMemData = NULL;
-   m_dwSysMemDataSize = 0L;
-   m_pVidMemData = NULL;
-   m_dwVidMemDataSize = 0L;
-   m_pResourceTags = NULL;
+   m_pSysMemData       = NULL;
+   m_pVidMemData       = NULL;
+   m_pResourceTags     = NULL;
+   m_dwSysMemDataSize  = 0L;
+   m_dwVidMemDataSize  = 0L;
    m_dwNumResourceTags = 0L;
-   m_bInitialized = FALSE;
+   m_bInitialized      = false;
 }
-
 
 PackedResource::~PackedResource()
 {
    Destroy();
 }
 
-void *PackedResource::GetData(const char *strName) const
+void *PackedResource::GetData(const char *strName)
 {
-   if (m_pResourceTags == NULL || strName == NULL)
+   if (!m_pResourceTags || !strName)
       return NULL;
 
-#if defined(_XBOX1)
-   for (DWORD i=0; m_pResourceTags[i].strName; i++)
-#elif defined(_XBOX360)
-      for (DWORD i = 0; i < m_dwNumResourceTags; i++)
-#endif
-      {
-         if (string_is_equal_noncase(strName, m_pResourceTags[i].strName))
-            return &m_pSysMemData[m_pResourceTags[i].dwOffset];
-      }
+   for (DWORD i = 0; i < m_dwNumResourceTags; i++)
+   {
+      if (string_is_equal_noncase(strName, m_pResourceTags[i].strName))
+         return &m_pSysMemData[m_pResourceTags[i].dwOffset];
+   }
 
    return NULL;
 }
 
 static INLINE void* AllocateContiguousMemory(DWORD Size, DWORD Alignment)
 {
-#if defined(_XBOX1)
-   return D3D_AllocContiguousMemory(Size, Alignment);
-#elif defined(_XBOX360)
    return XMemAlloc(Size, MAKE_XALLOC_ATTRIBUTES(0, 0, 0, 0, eXALLOCAllocatorId_GameMax,
             Alignment, XALLOC_MEMPROTECT_WRITECOMBINE, 0, XALLOC_MEMTYPE_PHYSICAL));
-#endif
 }
 
 static INLINE void FreeContiguousMemory(void* pData)
 {
-#if defined(_XBOX1)
-   return D3D_FreeContiguousMemory(pData);
-#elif defined(_XBOX360)
    return XMemFree(pData, MAKE_XALLOC_ATTRIBUTES(0, 0, 0, 0, eXALLOCAllocatorId_GameMax,
             0, 0, 0, XALLOC_MEMTYPE_PHYSICAL));
-#endif
 }
 
-#ifdef _XBOX1
-char g_strMediaPath[512] = "D:\\Media\\";
-
-static HRESULT FindMediaFile(char *strPath, const char *strFilename, size_t strPathsize)
-{
-   if(strFilename == NULL || strPath == NULL)
-      return E_INVALIDARG;
-
-   strlcpy(strPath, strFilename, strPathsize);
-
-   if(strFilename[1] != ':')
-      snprintf(strPath, strPathsize, "%s%s", g_strMediaPath, strFilename);
-
-   HANDLE hFile = CreateFile(strPath, GENERIC_READ, FILE_SHARE_READ, NULL, 
-         OPEN_EXISTING, 0, NULL);
-
-   if (hFile == INVALID_HANDLE_VALUE)
-      return 0x82000004;
-
-   CloseHandle(hFile);
-
-   return S_OK;
-}
-
-#endif
-
-#if defined(_XBOX1)
 HRESULT PackedResource::Create(const char *strFilename,
-      DWORD dwNumResourceTags, XBRESOURCE* pResourceTags)
-#elif defined(_XBOX360)
-HRESULT PackedResource::Create(const char *strFilename)
-#endif
+      DWORD dwNumResourceTags, void* pResourceTags)
 {
    unsigned i;
-   HANDLE hFile;
    DWORD dwNumBytesRead;
    XPR_HEADER xprh;
-   bool retval;
-#ifdef _XBOX1
-   BOOL bHasResourceOffsetsTable = FALSE;
-   char strResourcePath[512];
-
-   if (FAILED(FindMediaFile(strResourcePath, strFilename, sizeof(strResourcePath))))
-      return E_FAIL;
-   strFilename = strResourcePath;
-#endif
-
-   hFile = CreateFile(strFilename, GENERIC_READ, FILE_SHARE_READ, NULL,
+   HANDLE hFile = CreateFile(strFilename, GENERIC_READ, FILE_SHARE_READ, NULL,
          OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, NULL);
+
    if (hFile == INVALID_HANDLE_VALUE)
       return E_FAIL;
 
-   retval = ReadFile(hFile, &xprh, sizeof(XPR_HEADER), &dwNumBytesRead, NULL);
-
-#if defined(_XBOX1)
-   if(xprh.dwMagic == XPR0_MAGIC_VALUE)
-      bHasResourceOffsetsTable = FALSE;
-   else if(xprh.dwMagic == XPR1_MAGIC_VALUE)
-      bHasResourceOffsetsTable = TRUE;
-   else
-#elif defined(_XBOX360)
-      if(!retval)
-      {
-         CloseHandle(hFile);
-         return E_FAIL;
-      }
-
-   if (xprh.dwMagic != XPR2_MAGIC_VALUE)
-#endif
+   if (!ReadFile(hFile, &xprh, sizeof(XPR_HEADER), &dwNumBytesRead, NULL) ||
+         xprh.dwMagic != XPR2_MAGIC_VALUE)
    {
       CloseHandle(hFile);
       return E_FAIL;
    }
 
    /* Compute memory requirements */
-#if defined(_XBOX1)
-   m_dwSysMemDataSize = xprh.dwHeaderSize - sizeof(XPR_HEADER);
-   m_dwVidMemDataSize = xprh.dwTotalSize - xprh.dwHeaderSize;
-#elif defined(_XBOX360)
    m_dwSysMemDataSize = xprh.dwHeaderSize;
    m_dwVidMemDataSize = xprh.dwDataSize;
-#endif
 
    /* Allocate memory */
    m_pSysMemData = (BYTE*)malloc(m_dwSysMemDataSize);
-   if (m_pSysMemData == NULL)
+
+   if (!m_pSysMemData)
    {
       m_dwSysMemDataSize = 0;
       return E_FAIL;
    }
 
    m_pVidMemData = (BYTE*)AllocateContiguousMemory(m_dwVidMemDataSize,
-#if defined(_XBOX1)
-         D3DTEXTURE_ALIGNMENT
-#elif defined(_XBOX360)
          XALLOC_PHYSICAL_ALIGNMENT_4K
-#endif
-     );
+         );
 
-   if(m_pVidMemData == NULL)
+   if(!m_pVidMemData)
    {
       m_dwSysMemDataSize = 0;
       m_dwVidMemDataSize = 0;
@@ -319,83 +198,43 @@ HRESULT PackedResource::Create(const char *strFilename)
    /* Done with the file */
    CloseHandle( hFile);
 
-#ifdef _XBOX1
-   if (bHasResourceOffsetsTable)
+   /* Extract resource table from the header data */
+   m_dwNumResourceTags = *(DWORD*)(m_pSysMemData + 0);
+   m_pResourceTags     = (XBRESOURCE*)(m_pSysMemData + 4);
+
+   /* Patch up the resources */
+
+   for(i = 0; i < m_dwNumResourceTags; i++)
    {
-#endif
-
-      /* Extract resource table from the header data */
-      m_dwNumResourceTags = *(DWORD*)(m_pSysMemData + 0);
-      m_pResourceTags     = (XBRESOURCE*)(m_pSysMemData + 4);
-
-      /* Patch up the resources */
-
-      for(i = 0; i < m_dwNumResourceTags; i++)
+      m_pResourceTags[i].strName = (char*)(m_pSysMemData + (DWORD)m_pResourceTags[i].strName);
+      if((m_pResourceTags[i].dwType & 0xffff0000) == (RESOURCETYPE_TEXTURE & 0xffff0000))
       {
-         m_pResourceTags[i].strName = (char*)(m_pSysMemData + (DWORD)m_pResourceTags[i].strName);
-#ifdef _XBOX360
-         if((m_pResourceTags[i].dwType & 0xffff0000) == (RESOURCETYPE_TEXTURE & 0xffff0000))
-         {
-            D3DTexture *pTexture = (D3DTexture*)&m_pSysMemData[m_pResourceTags[i].dwOffset];
-            XGOffsetBaseTextureAddress(pTexture, m_pVidMemData, m_pVidMemData);
-         }
-#endif
+         D3DTexture *pTexture = (D3DTexture*)&m_pSysMemData[m_pResourceTags[i].dwOffset];
+         XGOffsetBaseTextureAddress(pTexture, m_pVidMemData, m_pVidMemData);
       }
-
-#ifdef _XBOX1
    }
-#endif
 
-#ifdef _XBOX1
-   /* Use user-supplied number of resources and the resource tags */
-   if(dwNumResourceTags != 0 || pResourceTags != NULL)
-   {
-      m_pResourceTags     = pResourceTags;
-      m_dwNumResourceTags = dwNumResourceTags;
-   }
-#endif
-
-   m_bInitialized = TRUE;
+   m_bInitialized = true;
 
    return S_OK;
 }
 
-#ifdef _XBOX360
-void PackedResource::GetResourceTags(DWORD* pdwNumResourceTags,
-      XBRESOURCE** ppResourceTags)
-{
-   if (pdwNumResourceTags)
-      (*pdwNumResourceTags) = m_dwNumResourceTags;
-
-   if (ppResourceTags)
-      (*ppResourceTags) = m_pResourceTags;
-}
-#endif
-
 void PackedResource::Destroy()
 {
    free(m_pSysMemData);
-   m_pSysMemData = NULL;
-   m_dwSysMemDataSize = 0L;
 
    if (m_pVidMemData != NULL)
       FreeContiguousMemory(m_pVidMemData);
 
-   m_pVidMemData = NULL;
-   m_dwVidMemDataSize = 0L;
-
-   m_pResourceTags = NULL;
+   m_pSysMemData       = NULL;
+   m_pVidMemData       = NULL;
+   m_pResourceTags     = NULL;
+   m_dwSysMemDataSize  = 0L;
+   m_dwVidMemDataSize  = 0L;
    m_dwNumResourceTags = 0L;
 
-   m_bInitialized = FALSE;
+   m_bInitialized = false;
 }
-
-BOOL PackedResource::Initialized() const
-{
-   return m_bInitialized;
-}
-
-#define FONT_SCALE(d3d) ((d3d->resolution_hd_enable) ? 2 : 1)
 
 typedef struct GLYPH_ATTR
 {
@@ -409,14 +248,14 @@ typedef struct GLYPH_ATTR
 typedef struct
 {
    D3DVertexDeclaration *m_pFontVertexDecl;
-   D3DVertexShader *m_pFontVertexShader;
-   D3DPixelShader *m_pFontPixelShader;
+   D3DVertexShader      *m_pFontVertexShader;
+   D3DPixelShader       *m_pFontPixelShader;
 } Font_Locals_t;
 
 typedef struct
 {
    Font_Locals_t s_FontLocals;
-   d3d_video_t *d3d;
+   d3d9_video_t *d3d;
    uint32_t m_dwSavedState;
    uint32_t m_cMaxGlyph;                /* Number of entries in the translator table. */
    uint32_t m_dwNumGlyphs;              /* Number of valid glyphs. */
@@ -425,13 +264,9 @@ typedef struct
    float m_fFontBottomPadding;          /* Padding below the strike zone. */
    float m_fFontYAdvance;               /* Number of pixels to move the cursor for a line feed. */
    wchar_t * m_TranslatorTable;         /* ASCII to glyph lookup table. */
-   D3DTexture* m_pFontTexture;
+   LPDIRECT3DTEXTURE9 m_pFontTexture;
    const GLYPH_ATTR* m_Glyphs;          /* Array of glyphs. */
 } xdk360_video_font_t;
-
-
-#define CALCFONTFILEHEADERSIZE(x) ( sizeof(uint32_t) + (sizeof(float)* 4) + sizeof(uint16_t) + (sizeof(wchar_t)*(x)) )
-#define FONTFILEVERSION 5
 
 typedef struct
 {
@@ -452,71 +287,62 @@ typedef struct
 
 static PackedResource m_xprResource;
 
-static HRESULT xdk360_video_font_create_shaders(xdk360_video_font_t * font)
+static bool xdk360_video_font_create_shaders(xdk360_video_font_t * font, LPDIRECT3DDEVICE9 dev)
 {
-   HRESULT hr;
-   LPDIRECT3DDEVICE d3dr = font->d3d->dev;
+   ID3DXBuffer* pShaderCode = NULL;
+
+   static const D3DVERTEXELEMENT9 decl[] =
+   {
+      { 0,  0, D3DDECLTYPE_FLOAT2,   D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+      { 0,  8, D3DDECLTYPE_USHORT2,  D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+      { 0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
+      D3DDECL_END()
+   };
 
    if (font->s_FontLocals.m_pFontVertexDecl)
    {
       font->s_FontLocals.m_pFontVertexDecl->AddRef();
       font->s_FontLocals.m_pFontVertexShader->AddRef();
       font->s_FontLocals.m_pFontPixelShader->AddRef();
-      return 0;
+      return true;
    }
 
-   do
-   {
-      static const D3DVERTEXELEMENT9 decl[] =
-      {
-         { 0,  0, D3DDECLTYPE_FLOAT2,   D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-         { 0,  8, D3DDECLTYPE_USHORT2,  D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-         { 0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1 },
-         D3DDECL_END()
-      };
+   if (!d3d9_vertex_declaration_new(dev, decl, (void**)&font->s_FontLocals.m_pFontVertexDecl))
+      goto error;
 
-      if (d3d_vertex_declaration_new(d3dr,decl, (void**)&font->s_FontLocals.m_pFontVertexDecl))
-      {
-         ID3DXBuffer* pShaderCode;
+   if (!d3d9x_compile_shader( font_hlsl_d3d9_program, sizeof(font_hlsl_d3d9_program)-1 ,
+            NULL, NULL, "main_vertex", "vs.2.0", 0, &pShaderCode, NULL, NULL ))
+      goto error;
 
-         hr = D3DXCompileShader( font_hlsl_d3d9_program, sizeof(font_hlsl_d3d9_program)-1 ,
-               NULL, NULL, "main_vertex", "vs.2.0", 0,&pShaderCode, NULL, NULL );
+   if (!d3d9_create_vertex_shader(dev, (const DWORD*)pShaderCode->GetBufferPointer(),
+         (void**)&font->s_FontLocals.m_pFontVertexShader ))
+      goto error;
 
-         if (hr >= 0)
-         {
-            hr = d3dr->CreateVertexShader((const DWORD*)pShaderCode->GetBufferPointer(),
-                  &font->s_FontLocals.m_pFontVertexShader );
-            pShaderCode->Release();
+   d3d9x_buffer_release(pShaderCode);
 
-            if (hr >= 0)
-            {
-               hr = D3DXCompileShader(font_hlsl_d3d9_program, sizeof(font_hlsl_d3d9_program)-1 ,
-                     NULL, NULL, "main_fragment", "ps.2.0", 0,&pShaderCode, NULL, NULL );
+   if (!d3d9x_compile_shader(font_hlsl_d3d9_program, sizeof(font_hlsl_d3d9_program)-1 ,
+            NULL, NULL, "main_fragment", "ps.2.0", 0,&pShaderCode, NULL, NULL ))
+      goto error;
 
-               if (hr >= 0)
-               {
-                  hr = d3dr->CreatePixelShader((DWORD*)pShaderCode->GetBufferPointer(),
-                        &font->s_FontLocals.m_pFontPixelShader );
-                  pShaderCode->Release();
+   if (!d3d9_create_pixel_shader(dev, (DWORD*)pShaderCode->GetBufferPointer(),
+         (void**)&font->s_FontLocals.m_pFontPixelShader))
+      goto error;
 
-                  if (hr >= 0) 
-                  {
-                     hr = 0;
-                     break;
-                  }
-               }
-               font->s_FontLocals.m_pFontVertexShader->Release();
-            }
+   d3d9x_buffer_release(pShaderCode);
 
-            font->s_FontLocals.m_pFontVertexShader = NULL;
-         }
+   return true;
 
-         d3d_vertex_declaration_free(font->s_FontLocals.m_pFontVertexDecl);
-      }
-      font->s_FontLocals.m_pFontVertexDecl = NULL;
-   }while(0);
+error:
+   if (pShaderCode)
+      d3d9x_buffer_release(pShaderCode);
+   d3d9_free_pixel_shader((LPDIRECT3DDEVICE9)font->d3d->dev,  font->s_FontLocals.m_pFontPixelShader);
+   d3d9_free_vertex_shader((LPDIRECT3DDEVICE9)font->d3d->dev, font->s_FontLocals.m_pFontVertexShader);
+   d3d9_vertex_declaration_free(font->s_FontLocals.m_pFontVertexDecl);
+   font->s_FontLocals.m_pFontPixelShader  = NULL;
+   font->s_FontLocals.m_pFontVertexShader = NULL;
+   font->s_FontLocals.m_pFontVertexDecl   = NULL;
 
-   return hr;
+   return false;
 }
 
 static void *xdk360_init_font(void *video_data,
@@ -525,7 +351,7 @@ static void *xdk360_init_font(void *video_data,
 {
    uint32_t dwFileVersion;
    const void *pFontData      = NULL;
-   D3DTexture *pFontTexture   = NULL;
+   void *pFontTexture         = NULL;
    const uint8_t * pData      = NULL;
    xdk360_video_font_t *font  = (xdk360_video_font_t*)calloc(1, sizeof(*font));
 
@@ -534,7 +360,7 @@ static void *xdk360_init_font(void *video_data,
 
    (void)font_size;
 
-   font->d3d                  = (d3d_video_t*)video_data;
+   font->d3d                  = (d3d9_video_t*)video_data;
 
    font->m_pFontTexture       = NULL;
    font->m_dwNumGlyphs        = 0L;
@@ -543,14 +369,14 @@ static void *xdk360_init_font(void *video_data,
    font->m_TranslatorTable    = NULL;
 
    /* Create the font. */
-   if (FAILED( m_xprResource.Create(font_path)))
+   if (FAILED( m_xprResource.Create(font_path, 0, NULL)))
       goto error;
 
-   pFontTexture               = m_xprResource.GetTexture( "FontTexture" );
+   pFontTexture               = (LPDIRECT3DTEXTURE9)m_xprResource.GetTexture( "FontTexture" );
    pFontData                  = m_xprResource.GetData( "FontData"); 
 
    /* Save a copy of the texture. */
-   font->m_pFontTexture       = pFontTexture;
+   font->m_pFontTexture       = (LPDIRECT3DTEXTURE9)pFontTexture;
 
    /* Check version of file (to make sure it matches up with the FontMaker tool). */
    pData                      = (const uint8_t*)pFontData;
@@ -571,14 +397,14 @@ static void *xdk360_init_font(void *video_data,
    font->m_cMaxGlyph          = ((const FontFileHeaderImage_t *)pData)->m_cMaxGlyph;
    font->m_TranslatorTable    = const_cast<FontFileHeaderImage_t*>((const FontFileHeaderImage_t *)pData)->m_TranslatorTable;
 
-   pData += CALCFONTFILEHEADERSIZE( font->m_cMaxGlyph + 1 );
+   pData                     += CALCFONTFILEHEADERSIZE(font->m_cMaxGlyph + 1);
 
    /* Read the glyph attributes from the file. */
    font->m_dwNumGlyphs        = ((const FontFileStrikesImage_t *)pData)->m_dwNumGlyphs;
    font->m_Glyphs             = ((const FontFileStrikesImage_t *)pData)->m_Glyphs;
 
    /* Create the vertex and pixel shaders for rendering the font */
-   if (FAILED(xdk360_video_font_create_shaders(font)))
+   if (!xdk360_video_font_create_shaders(font, (LPDIRECT3DDEVICE9)font->d3d->dev))
    {
       RARCH_ERR( "Could not create font shaders.\n" );
       goto error;
@@ -607,18 +433,15 @@ static void xdk360_free_font(void *data, bool is_threaded)
    font->m_cMaxGlyph       = 0;
    font->m_TranslatorTable = NULL;
 
-   if (font->s_FontLocals.m_pFontPixelShader)
-      font->s_FontLocals.m_pFontPixelShader->Release();
-   if (font->s_FontLocals.m_pFontVertexShader)
-      font->s_FontLocals.m_pFontVertexShader->Release();
-   if (font->s_FontLocals.m_pFontVertexDecl)
-      d3d_vertex_declaration_free(font->s_FontLocals.m_pFontVertexDecl);
+   d3d9_free_pixel_shader((LPDIRECT3DDEVICE9)font->d3d->dev, font->s_FontLocals.m_pFontPixelShader);
+   d3d9_free_vertex_shader((LPDIRECT3DDEVICE9)font->d3d->dev, font->s_FontLocals.m_pFontVertexShader);
+   d3d9_vertex_declaration_free(font->s_FontLocals.m_pFontVertexDecl);
 
    font->s_FontLocals.m_pFontPixelShader  = NULL;
    font->s_FontLocals.m_pFontVertexShader = NULL;
    font->s_FontLocals.m_pFontVertexDecl   = NULL;
 
-   if (m_xprResource.Initialized())
+   if (m_xprResource.m_bInitialized)
       m_xprResource.Destroy();
 
    free(font);
@@ -627,72 +450,79 @@ static void xdk360_free_font(void *data, bool is_threaded)
 
 static void xdk360_render_msg_post(xdk360_video_font_t * font)
 {
-   LPDIRECT3DDEVICE d3dr = font->d3d->dev;
+   LPDIRECT3DDEVICE9 dev;
+   if (!font || !font->d3d)
+      return;
+   dev = (LPDIRECT3DDEVICE9)font->d3d->dev;
 
-   d3d_set_texture(d3dr, 0, NULL);
-   d3d_set_vertex_declaration(d3dr, NULL);
-   d3d_set_vertex_shader(d3dr, 0, NULL);
-   D3DDevice_SetPixelShader(d3dr, NULL);
-   d3d_set_render_state(d3dr, D3DRS_VIEWPORTENABLE, font->m_dwSavedState);
+   if (!dev)
+	   return;
+
+   d3d9_set_texture(dev, 0, NULL);
+   d3d9_set_vertex_declaration(dev, NULL);
+   d3d9_set_vertex_shader(dev, 0, NULL);
+   d3d9_set_pixel_shader(dev, NULL);
+   d3d9_set_render_state(dev, D3DRS_VIEWPORTENABLE, font->m_dwSavedState);
 }
 
 static void xdk360_render_msg_pre(xdk360_video_font_t * font)
 {
    float vTexScale[4];
    D3DSURFACE_DESC TextureDesc;
-   LPDIRECT3DDEVICE d3dr = font->d3d->dev;
+   LPDIRECT3DDEVICE9 dev;
+
+   if (!font || !font->d3d)
+      return;
+
+   dev = (LPDIRECT3DDEVICE9)font->d3d->dev;
+
+   if (!dev)
+	   return;
 
    /* Save state. */
-   d3dr->GetRenderState( D3DRS_VIEWPORTENABLE, (DWORD*)&font->m_dwSavedState );
+   d3d9_get_render_state(font->d3d->dev, D3DRS_VIEWPORTENABLE,
+         (DWORD*)&font->m_dwSavedState );
 
    /* Set the texture scaling factor as a vertex shader constant. */
    /* Get the description */
-   d3d_texture_get_level_desc(font->m_pFontTexture, 0, &TextureDesc);
+   d3d9_texture_get_level_desc(font->m_pFontTexture, 0, &TextureDesc);
 
    /* Set render state. */
-   d3d_set_texture(d3dr, 0, font->m_pFontTexture);
+   d3d9_set_texture(dev, 0, font->m_pFontTexture);
 
-   /* Read the TextureDesc here to ensure no load/hit/store from d3d_texture_get_level_desc(). */
-   vTexScale[0] = 1.0f / TextureDesc.Width;		/* LHS due to int->float conversion. */
+   vTexScale[0] = 1.0f / TextureDesc.Width;
    vTexScale[1] = 1.0f / TextureDesc.Height;
    vTexScale[2] = 0.0f;
    vTexScale[3] = 0.0f;
 
-   d3d_set_render_state(d3dr, D3DRS_VIEWPORTENABLE, FALSE);
-   d3d_set_vertex_declaration(d3dr, font->s_FontLocals.m_pFontVertexDecl);
-   d3d_set_vertex_shader(d3dr, 0, font->s_FontLocals.m_pFontVertexShader);
-   d3dr->SetPixelShader(font->s_FontLocals.m_pFontPixelShader);
-
-   /* Set the texture scaling factor as a vertex shader constant.
-    * Call here to avoid load hit store from writing to vTexScale above
-    */
-   d3dr->SetVertexShaderConstantF( 2, vTexScale, 1 );
+   d3d9_set_render_state(dev, D3DRS_VIEWPORTENABLE, FALSE);
+   d3d9_set_vertex_declaration(dev, font->s_FontLocals.m_pFontVertexDecl);
+   d3d9_set_vertex_shader(dev, 0, font->s_FontLocals.m_pFontVertexShader);
+   d3d9_set_pixel_shader(dev, font->s_FontLocals.m_pFontPixelShader);
+   d3d9_set_vertex_shader_constantf(dev, 2, vTexScale, 1);
 }
 
 static void xdk360_draw_text(xdk360_video_font_t *font,
       float x, float y, const wchar_t * strText)
 {
    uint32_t dwNumChars;
-   volatile float *pVertex;
    float vColor[4], m_fCursorX, m_fCursorY;
-   LPDIRECT3DDEVICE d3dr = font->d3d->dev;
+   volatile float *pVertex = NULL;
+   LPDIRECT3DDEVICE9 dev   = (LPDIRECT3DDEVICE9)font->d3d->dev;
 
    /* Set the color as a vertex shader constant. */
-   vColor[0] = ((0xffffffff & 0x00ff0000) >> 16L) / 255.0f;
-   vColor[1] = ((0xffffffff & 0x0000ff00) >> 8L)  / 255.0f;
-   vColor[2] = ((0xffffffff & 0x000000ff) >> 0L)  / 255.0f;
-   vColor[3] = ((0xffffffff & 0xff000000) >> 24L) / 255.0f;
+   vColor[0]   = ((0xffffffff & 0x00ff0000) >> 16L) / 255.0f;
+   vColor[1]   = ((0xffffffff & 0x0000ff00) >> 8L)  / 255.0f;
+   vColor[2]   = ((0xffffffff & 0x000000ff) >> 0L)  / 255.0f;
+   vColor[3]   = ((0xffffffff & 0xff000000) >> 24L) / 255.0f;
 
-   /* Perform the actual storing of the color constant here to prevent
-    * a load-hit-store by inserting work between the store and the use of
-    * the vColor array. */
-   d3dr->SetVertexShaderConstantF(1, vColor, 1);
+   d3d9_set_vertex_shader_constantf(dev, 1, vColor, 1);
 
-   m_fCursorX = floorf(x);
-   m_fCursorY = floorf(y);
+   m_fCursorX  = floorf(x);
+   m_fCursorY  = floorf(y);
 
    /* Adjust for padding. */
-   y -= font->m_fFontTopPadding;
+   y          -= font->m_fFontTopPadding;
 
    /* Begin drawing the vertices
     * Declared as volatile to force writing in ascending
@@ -703,8 +533,13 @@ static void xdk360_draw_text(xdk360_video_font_t *font,
     */
 
    dwNumChars = wcslen(strText);
-   d3dr->BeginVertices(D3DPT_QUADLIST, 4 * dwNumChars,
+#ifdef __cplusplus
+   dev->BeginVertices(D3DPT_QUADLIST, 4 * dwNumChars,
          sizeof(XMFLOAT4), (void**)&pVertex);
+#else
+   D3DDevice_BeginVertices(dev, D3DPT_QUADLIST, 4 * dwNumChars,
+         sizeof(XMFLOAT4), (void**)&pVertex);
+#endif
 
    /* Draw four vertices for each glyph. */
    while (*strText)
@@ -726,14 +561,14 @@ static void xdk360_draw_text(xdk360_video_font_t *font,
 
       /* Translate unprintable characters. */
       if (letter <= font->m_cMaxGlyph)
-         pGlyph = &font->m_Glyphs[font->m_TranslatorTable[letter]];
+         pGlyph   = &font->m_Glyphs[font->m_TranslatorTable[letter]];
       else
-         pGlyph = &font->m_Glyphs[0];
+         pGlyph   = &font->m_Glyphs[0];
 
-      fOffset  = FONT_SCALE(font->d3d) * (float)pGlyph->wOffset;
-      fAdvance = FONT_SCALE(font->d3d) * (float)pGlyph->wAdvance;
-      fWidth   = FONT_SCALE(font->d3d) * (float)pGlyph->wWidth;
-      fHeight  = FONT_SCALE(font->d3d) * font->m_fFontHeight;
+      fOffset     = FONT_SCALE(font->d3d) * (float)pGlyph->wOffset;
+      fAdvance    = FONT_SCALE(font->d3d) * (float)pGlyph->wAdvance;
+      fWidth      = FONT_SCALE(font->d3d) * (float)pGlyph->wWidth;
+      fHeight     = FONT_SCALE(font->d3d) * font->m_fFontHeight;
 
       m_fCursorX += fOffset;
 
@@ -762,28 +597,27 @@ static void xdk360_draw_text(xdk360_video_font_t *font,
        */
 
       /* Setup the vertex/screen coordinates */
-
-      pVertex[0]  = m_fCursorX;
-      pVertex[1]  = m_fCursorY;
-      pVertex[3]  = 0;
-      pVertex[4]  = m_fCursorX + fWidth;
-      pVertex[5]  = m_fCursorY;
-      pVertex[7]  = 0;
-      pVertex[8]  = m_fCursorX + fWidth;
-      pVertex[9]  = m_fCursorY + fHeight;
-      pVertex[11] = 0;
-      pVertex[12] = m_fCursorX;
-      pVertex[13] = m_fCursorY + fHeight;
+      pVertex[0]                         = m_fCursorX;
+      pVertex[1]                         = m_fCursorY;
+      pVertex[3]                         = 0;
+      pVertex[4]                         = m_fCursorX + fWidth;
+      pVertex[5]                         = m_fCursorY;
+      pVertex[7]                         = 0;
+      pVertex[8]                         = m_fCursorX + fWidth;
+      pVertex[9]                         = m_fCursorY + fHeight;
+      pVertex[11]                        = 0;
+      pVertex[12]                        = m_fCursorX;
+      pVertex[13]                        = m_fCursorY + fHeight;
 #ifdef MSB_FIRST
       ((volatile uint32_t *)pVertex)[2]  = (tu1 << 16) | tv1;       /* Merged using big endian rules */
       ((volatile uint32_t *)pVertex)[6]  = (tu2 << 16) | tv1;       /* Merged using big endian rules */
-      ((volatile uint32_t*)pVertex)[10] = (tu2 << 16) | tv2;        /* Merged using big endian rules */
-      ((volatile uint32_t*)pVertex)[14] = (tu1 << 16) | tv2;        /* Merged using big endian rules */
+      ((volatile uint32_t*)pVertex)[10]  = (tu2 << 16) | tv2;        /* Merged using big endian rules */
+      ((volatile uint32_t*)pVertex)[14]  = (tu1 << 16) | tv2;        /* Merged using big endian rules */
 #endif
-      pVertex[15] = 0;
-      pVertex += 16;
+      pVertex[15]                        = 0;
+      pVertex                           += 16;
 
-      m_fCursorX += fAdvance;
+      m_fCursorX                        += fAdvance;
 
       dwNumChars--;
    }
@@ -803,18 +637,21 @@ static void xdk360_draw_text(xdk360_video_font_t *font,
       dwNumChars--;
    }
 
-   d3dr->EndVertices();
+#ifdef __cplusplus
+   dev->EndVertices();
+#else
+   D3DDevice_EndVertices(dev);
+#endif
 }
 
 static void xdk360_render_msg(
       video_frame_info_t *video_info,
       void *data, const char *str_msg,
-      const void *userdata)
+      const struct font_params *params)
 {
    float x, y;
    wchar_t msg[PATH_MAX_LENGTH];
    xdk360_video_font_t *font        = (xdk360_video_font_t*)data;
-   const struct font_params *params = (const struct font_params*)userdata;
 
    if (params)
    {

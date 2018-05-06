@@ -28,7 +28,7 @@
 #include "SDL.h"
 
 static enum gfx_ctx_api sdl_api = GFX_CTX_OPENGL_API;
-static unsigned       g_major = 2;
+static unsigned       g_major   = 2;
 static unsigned       g_minor = 1;
 
 typedef struct gfx_ctx_sdl_data
@@ -119,8 +119,14 @@ static void sdl_ctx_destroy(void *data)
    free(sdl);
 }
 
-static bool sdl_ctx_bind_api(void *data, enum gfx_ctx_api api, unsigned major,
-                             unsigned minor)
+static enum gfx_ctx_api sdl_ctx_get_api(void *data)
+{
+   return sdl_api;
+}
+
+static bool sdl_ctx_bind_api(void *data,
+      enum gfx_ctx_api api, unsigned major,
+      unsigned minor)
 {
 #ifdef HAVE_SDL2
    unsigned profile;
@@ -374,7 +380,6 @@ static void sdl_ctx_swap_buffers(void *data, void *data2)
 #else
    SDL_GL_SwapBuffers();
 #endif
-   (void)data;
 }
 
 static void sdl_ctx_input_driver(void *data,
@@ -412,10 +417,12 @@ const gfx_ctx_driver_t gfx_ctx_sdl_gl =
 {
    sdl_ctx_init,
    sdl_ctx_destroy,
+   sdl_ctx_get_api,
    sdl_ctx_bind_api,
    sdl_ctx_swap_interval,
    sdl_ctx_set_video_mode,
    sdl_ctx_get_video_size,
+   NULL, /* get_refresh_rate */
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */

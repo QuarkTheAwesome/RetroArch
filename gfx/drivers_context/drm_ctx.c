@@ -789,16 +789,21 @@ static bool gfx_ctx_drm_suppress_screensaver(void *data, bool enable)
    return false;
 }
 
+static enum gfx_ctx_api gfx_ctx_drm_get_api(void *data)
+{
+   return drm_api;
+}
+
 static bool gfx_ctx_drm_bind_api(void *video_driver,
       enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
    (void)video_driver;
 
+   drm_api     = api;
 #ifdef HAVE_EGL
    g_egl_major = major;
    g_egl_minor = minor;
 #endif
-   drm_api     = api;
 
    switch (api)
    {
@@ -898,10 +903,12 @@ static void gfx_ctx_drm_set_flags(void *data, uint32_t flags)
 const gfx_ctx_driver_t gfx_ctx_drm = {
    gfx_ctx_drm_init,
    gfx_ctx_drm_destroy,
+   gfx_ctx_drm_get_api,
    gfx_ctx_drm_bind_api,
    gfx_ctx_drm_swap_interval,
    gfx_ctx_drm_set_video_mode,
    gfx_ctx_drm_get_video_size,
+   drm_get_refresh_rate,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */

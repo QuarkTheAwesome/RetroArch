@@ -737,6 +737,7 @@ static bool ctr_frame(void* data, const void* frame,
       GPU_SetTexEnv(2, GPU_PREVIOUS, GPU_PREVIOUS, 0, 0, 0, 0, 0);
    }
 
+#ifdef HAVE_MENU
    if (ctr->menu_texture_enable)
    {
       if(ctr->menu_texture_frame_enable)
@@ -770,6 +771,18 @@ static bool ctr_frame(void* data, const void* frame,
       ctr->msg_rendering_enabled = false;
 
    }
+   else if (video_info->statistics_show)
+   {
+      struct font_params *osd_params = (struct font_params*)
+         &video_info->osd_stat_params;
+
+      if (osd_params)
+      {
+         font_driver_render_msg(video_info, NULL, video_info->stat_text,
+               (const struct font_params*)&video_info->osd_stat_params);
+      }
+   }
+#endif
 
    if (msg)
       font_driver_render_msg(video_info, NULL, msg, NULL);
@@ -1120,10 +1133,12 @@ static void ctr_set_osd_msg(void *data,
 }
 
 static const video_poke_interface_t ctr_poke_interface = {
+   NULL, /* get_flags */
    NULL,                                  /* set_coords */
    NULL,                                  /* set_mvp    */
    ctr_load_texture,
    ctr_unload_texture,
+   NULL,
    NULL,
    ctr_set_filtering,
    NULL,                                  /* get_video_output_size */
@@ -1136,9 +1151,11 @@ static const video_poke_interface_t ctr_poke_interface = {
    ctr_set_texture_frame,
    ctr_set_texture_enable,
    ctr_set_osd_msg,
-   NULL,
-   NULL,
-   NULL
+   NULL,                   /* show_mouse */
+   NULL,                   /* grab_mouse_toggle */
+   NULL,                   /* get_current_shader */
+   NULL,                   /* get_current_software_framebuffer */
+   NULL                    /* get_hw_render_interface */
 };
 
 static void ctr_get_poke_interface(void* data,

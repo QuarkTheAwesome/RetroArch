@@ -37,12 +37,15 @@
 #include <stdio.h>
 #include <stdlib.h> /* for qsort() */
 #include <string.h> /* for memset() */
-#include "FLAC/assert.h"
-#include "FLAC/format.h"
-#include "share/alloc.h"
-#include "share/compat.h"
-#include "private/format.h"
-#include "private/macros.h"
+
+#include <retro_miscellaneous.h>
+
+#include "include/FLAC/assert.h"
+#include "include/FLAC/format.h"
+#include "include/share/alloc.h"
+#include "include/share/compat.h"
+#include "include/private/format.h"
+#include "include/private/macros.h"
 
 /* FLAC_PACKAGE_VERSION should come from configure */
 #if defined(__LIBRETRO__) || defined(RARCH_INTERNAL)
@@ -538,7 +541,7 @@ unsigned FLAC__format_get_max_rice_partition_order_from_blocksize(unsigned block
 		max_rice_partition_order++;
 		blocksize >>= 1;
 	}
-	return flac_min(FLAC__MAX_RICE_PARTITION_ORDER, max_rice_partition_order);
+	return MIN(FLAC__MAX_RICE_PARTITION_ORDER, max_rice_partition_order);
 }
 
 unsigned FLAC__format_get_max_rice_partition_order_from_blocksize_limited_max_and_predictor_order(unsigned limit, unsigned blocksize, unsigned predictor_order)

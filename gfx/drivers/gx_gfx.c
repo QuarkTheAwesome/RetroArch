@@ -1266,11 +1266,13 @@ static void gx_get_video_output_next(void *data)
 }
 
 static const video_poke_interface_t gx_poke_interface = {
+   NULL, /* get_flags */
    NULL,                      /* set_coords */
    NULL,                      /* set_mvp */
    NULL,
    NULL,
    gx_set_video_mode,
+   NULL, /* get_refresh_rate */
    NULL,
    gx_get_video_output_size,
    gx_get_video_output_prev,
@@ -1281,6 +1283,12 @@ static const video_poke_interface_t gx_poke_interface = {
    gx_apply_state_changes,
    gx_set_texture_frame,
    gx_set_texture_enable,
+   NULL,                         /* set_osd_msg */
+   NULL,                         /* show_mouse */
+   NULL,                         /* grab_mouse_toggle */
+   NULL,                         /* get_current_shader */
+   NULL,                         /* get_current_software_framebuffer */
+   NULL                          /* get_hw_render_interface */
 };
 
 static void gx_get_poke_interface(void *data,

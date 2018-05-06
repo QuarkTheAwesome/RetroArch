@@ -27,6 +27,10 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_NETWORKING
+#include "network/netplay/netplay.h"
+#endif
+
 #if defined(HW_RVL)
 #define MAX_GAMMA_SETTING 30
 #elif defined(GEKKO)
@@ -63,13 +67,17 @@ static bool bundle_assets_extract_enable = false;
 static bool materialui_icons_enable      = true;
 #endif
 
+static const bool crt_switch_resolution = false; 	
+static const int crt_switch_resolution_super = 2560; 
+
+
 static const bool def_history_list_enable = true;
 static const bool def_playlist_entry_remove = true;
 static const bool def_playlist_entry_rename = true;
 
 static const unsigned int def_user_language = 0;
 
-#if (defined(_WIN32) && !defined(_XBOX)) || (defined(__linux) && !defined(ANDROID) && !defined(HAVE_LAKKA)) || (defined(__MACH__) && !defined(IOS))
+#if (defined(_WIN32) && !defined(_XBOX)) || (defined(__linux) && !defined(ANDROID) && !defined(HAVE_LAKKA)) || (defined(__MACH__) && !defined(IOS)) || defined(EMSCRIPTEN)
 static const bool def_mouse_enable = true;
 #else
 static const bool def_mouse_enable = false;
@@ -121,6 +129,9 @@ static const unsigned fullscreen_y = 0;
  */
 static const unsigned window_opacity = 100;
 
+/* Whether to show the usual window decorations like border, titlebar etc. */
+static const bool window_decorations = true;
+
 #if defined(RARCH_CONSOLE) || defined(__APPLE__)
 static const bool load_dummy_on_core_shutdown = false;
 #else
@@ -170,7 +181,7 @@ static unsigned swap_interval = 1;
 static const bool video_threaded = false;
 
 #if defined(HAVE_THREADS)
-#if defined(GEKKO) || defined(PSP) || defined(_3DS) || defined(_XBOX1)
+#if defined(GEKKO) || defined(PSP) || defined(_3DS)
 /* For single-core consoles right now it's better to have this be disabled. */
 static const bool threaded_data_runloop_enable = false;
 #else
@@ -286,6 +297,7 @@ static bool content_show_history     = true;
 #ifdef HAVE_LIBRETRODB
 static bool content_show_add     	 = true;
 #endif
+static bool content_show_playlists   = true;
 
 #ifdef HAVE_XMB
 static unsigned xmb_scale_factor = 100;
@@ -293,9 +305,10 @@ static unsigned xmb_alpha_factor = 75;
 static unsigned menu_font_color_red = 255;
 static unsigned menu_font_color_green = 255;
 static unsigned menu_font_color_blue = 255;
+static unsigned xmb_menu_layout  = 0;
 static unsigned xmb_icon_theme   = XMB_ICON_THEME_MONOCHROME;
 static unsigned xmb_theme        = XMB_THEME_ELECTRIC_BLUE;
-#ifdef HAVE_LAKKA
+#if defined(HAVE_LAKKA) || defined(__arm__) || defined(__PPC64__) || defined(__ppc64__) || defined(__powerpc64__) || defined(__powerpc__) || defined(__ppc__) || defined(__POWERPC__)
 static bool xmb_shadows_enable   = false;
 #else
 static bool xmb_shadows_enable   = true;
@@ -345,6 +358,8 @@ static bool default_screenshots_in_content_dir = false;
 static unsigned menu_toggle_gamepad_combo    = INPUT_TOGGLE_L3_R3;
 #elif defined(VITA)
 static unsigned menu_toggle_gamepad_combo    = INPUT_TOGGLE_L1_R1_START_SELECT;
+#elif defined(SWITCH)
+static unsigned menu_toggle_gamepad_combo    = INPUT_TOGGLE_START_SELECT;
 #else
 static unsigned menu_toggle_gamepad_combo    = INPUT_TOGGLE_NONE;
 #endif
@@ -399,6 +414,9 @@ static const bool post_filter_record = false;
 
 /* Screenshots post-shaded GPU output if available. */
 static const bool gpu_screenshot = true;
+
+/* Watch shader files for changes and auto-apply as necessary. */
+static const bool video_shader_watch_files = false;
 
 /* Screenshots named automatically. */
 static const bool auto_screenshot_filename = true;
@@ -544,6 +562,14 @@ static const int netplay_check_frames = 600;
 
 static const bool netplay_use_mitm_server = false;
 
+static const char *netplay_mitm_server = "nyc";
+
+#ifdef HAVE_NETWORKING
+static const unsigned netplay_share_digital = RARCH_NETPLAY_SHARE_DIGITAL_NO_PREFERENCE;
+
+static const unsigned netplay_share_analog = RARCH_NETPLAY_SHARE_ANALOG_NO_PREFERENCE;
+#endif
+
 /* On save state load, block SRAM from being overwritten.
  * This could potentially lead to buggy games. */
 static const bool block_sram_overwrite = false;
@@ -569,6 +595,12 @@ static const float slowmotion_ratio = 3.0;
 /* Maximum fast forward ratio. */
 static const float fastforward_ratio = 0.0;
 
+/* Run core logic one or more frames ahead then load the state back to reduce perceived input lag. */
+static const unsigned run_ahead_frames = 1;
+
+/* When using the Run Ahead feature, use a secondary instance of the core. */
+static const bool run_ahead_secondary_instance = true;
+
 /* Enable stdin/network command interface. */
 static const bool network_cmd_enable = false;
 static const uint16_t network_cmd_port = 55355;
@@ -581,11 +613,7 @@ static const unsigned default_content_history_size = 100;
 /* Show Menu start-up screen on boot. */
 static const bool default_menu_show_start_screen = true;
 
-#ifdef RARCH_MOBILE
 static const bool menu_dpi_override_enable = false;
-#else
-static const bool menu_dpi_override_enable = true;
-#endif
 
 #ifdef RARCH_MOBILE
 static const unsigned menu_dpi_override_value = 72;
@@ -630,6 +658,10 @@ static const unsigned input_bind_timeout = 5;
 
 static const unsigned menu_thumbnails_default = 3;
 
+static const unsigned menu_left_thumbnails_default = 0;
+
+static const bool xmb_vertical_thumbnails = false;
+
 #ifdef IOS
 static const bool ui_companion_start_on_boot = false;
 #else
@@ -637,6 +669,12 @@ static const bool ui_companion_start_on_boot = true;
 #endif
 
 static const bool ui_companion_enable = false;
+
+/* Currently only used to show the WIMP UI on startup */
+static const bool ui_companion_toggle = false;
+
+/* Only init the WIMP UI for this session if this is enabled */
+static const bool desktop_menu_enable = true;
 
 #if defined(__QNX__) || defined(_XBOX1) || defined(_XBOX360) || defined(__CELLOS_LV2__) || (defined(__MACH__) && defined(IOS)) || defined(ANDROID) || defined(WIIU) || defined(HAVE_NEON) || defined(GEKKO) || defined(__ARM_NEON__)
 static enum resampler_quality audio_resampler_quality_level = RESAMPLER_QUALITY_LOWER;
@@ -670,7 +708,7 @@ static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/apple/
 #endif
 #elif defined(_WIN32) && !defined(_XBOX)
 #if _MSC_VER == 1600
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(_M_X64)
 static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/windows-msvc2010/x86_64/latest/";
 #elif defined(__i386__) || defined(__i486__) || defined(__i686__) || defined(_M_IX86) || defined(_M_IA64)
 static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/windows-msvc2010/x86/latest/";
@@ -680,7 +718,7 @@ static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/window
 #elif _MSC_VER == 1310
 static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/windows-msvc2003/x86/latest/";
 #else
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(_M_X64)
 static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/windows/x86_64/latest/";
 #elif defined(__i386__) || defined(__i486__) || defined(__i686__) || defined(_M_IX86) || defined(_M_IA64)
 static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/windows/x86/latest/";
@@ -699,11 +737,11 @@ static char buildbot_server_url[] = "";
 #elif defined(WIIU)
 static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/nintendo/wiiu/latest/";
 #elif defined(__CELLOS_LV2__) && defined(DEX_BUILD)
-static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/playstation/ps3/latest/dex-ps3/";
+static char buildbot_server_url[] = "http://libretro.xbins.org/libretro/nightly/playstation/ps3/latest/dex-ps3/";
 #elif defined(__CELLOS_LV2__) && defined(CEX_BUILD)
-static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/playstation/ps3/latest/cex-ps3/";
+static char buildbot_server_url[] = "http://libretro.xbins.org/libretro/nightly/playstation/ps3/latest/cex-ps3/";
 #elif defined(__CELLOS_LV2__) && defined(ODE_BUILD)
-static char buildbot_server_url[] = "http://buildbot.libretro.com/nightly/playstation/ps3/latest/ode-ps3/";
+static char buildbot_server_url[] = "http://libretro.xbins.org/libretro/nightly/playstation/ps3/latest/ode-ps3/";
 #else
 static char buildbot_server_url[] = "";
 #endif

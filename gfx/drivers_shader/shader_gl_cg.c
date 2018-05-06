@@ -27,7 +27,6 @@
 #include <file/config_file.h>
 #include <file/file_path.h>
 #include <retro_assert.h>
-#include <rhash.h>
 #include <string/stdstring.h>
 
 #ifdef HAVE_CONFIG_H
@@ -50,13 +49,6 @@
 #include "../video_shader_parse.h"
 #include "../../core.h"
 #include "../../managers/state_manager.h"
-
-#define SEMANTIC_TEXCOORD     0x92ee91cdU
-#define SEMANTIC_TEXCOORD0    0xf0c0cb9dU
-#define SEMANTIC_TEXCOORD1    0xf0c0cb9eU
-#define SEMANTIC_COLOR        0x0ce809a4U
-#define SEMANTIC_COLOR0       0xa9e93e54U
-#define SEMANTIC_POSITION     0xd87309baU
 
 #define PREV_TEXTURES         (GFX_MAX_TEXTURES - 1)
 
@@ -315,23 +307,28 @@ static void gl_cg_set_texture_info(
       gl_cg_set_coord_array(params->coord, cg, info->coord, 2);
 }
 
-static void gl_cg_set_params(void *data, void *shader_data,
-      unsigned width, unsigned height,
-      unsigned tex_width, unsigned tex_height,
-      unsigned out_width, unsigned out_height,
-      unsigned frame_count,
-      const void *_info,
-      const void *_prev_info,
-      const void *_feedback_info,
-      const void *_fbo_info,
-      unsigned fbo_info_cnt)
+static void gl_cg_set_params(void *dat, void *shader_data)
 {
    unsigned i;
+   video_shader_ctx_params_t          *params = 
+      (video_shader_ctx_params_t*)dat;
+   unsigned width                             = params->width;
+   unsigned height                            = params->height;
+   unsigned tex_width                         = params->tex_width;
+   unsigned tex_height                        = params->tex_height;
+   unsigned out_width                         = params->out_width;
+   unsigned out_height                        = params->out_height;
+   unsigned frame_count                       = params->frame_counter;
+   const void *_info                          = params->info;
+   const void *_prev_info                     = params->prev_info;
+   const void *_feedback_info                 = params->feedback_info;
+   const void *_fbo_info                      = params->fbo_info;
+   unsigned fbo_info_cnt                      = params->fbo_info_cnt;
    const struct video_tex_info *info          = (const struct video_tex_info*)_info;
    const struct video_tex_info *prev_info     = (const struct video_tex_info*)_prev_info;
    const struct video_tex_info *feedback_info = (const struct video_tex_info*)_feedback_info;
    const struct video_tex_info *fbo_info      = (const struct video_tex_info*)_fbo_info;
-   cg_shader_data_t *cg                = (cg_shader_data_t*)shader_data;
+   cg_shader_data_t *cg                       = (cg_shader_data_t*)shader_data;
 
    if (!cg || (cg->active_idx == 0))
          return;
@@ -589,7 +586,6 @@ static void gl_cg_set_program_base_attrib(void *data, unsigned i)
 
    for (; param; param = cgGetNextParameter(param))
    {
-      uint32_t semantic_hash;
       const char *semantic = NULL;
       if (     (cgGetParameterDirection(param)   != CG_IN)
             || (cgGetParameterVariability(param) != CG_VARYING))
@@ -601,25 +597,20 @@ static void gl_cg_set_program_base_attrib(void *data, unsigned i)
 
       RARCH_LOG("[CG]: Found semantic \"%s\" in prog #%u.\n", semantic, i);
 
-      semantic_hash = djb2_calculate(semantic);
-
-      switch (semantic_hash)
-      {
-         case SEMANTIC_TEXCOORD:
-         case SEMANTIC_TEXCOORD0:
-            cg->prg[i].tex     = param;
-            break;
-         case SEMANTIC_COLOR:
-         case SEMANTIC_COLOR0:
+      if (
+            string_is_equal(semantic, "TEXCOORD") ||
+            string_is_equal(semantic, "TEXCOORD0")
+         )
+         cg->prg[i].tex     = param;
+      else if (
+            string_is_equal(semantic, "COLOR") ||
+            string_is_equal(semantic, "COLOR0")
+            )
             cg->prg[i].color   = param;
-            break;
-         case SEMANTIC_POSITION:
-            cg->prg[i].vertex  = param;
-            break;
-         case SEMANTIC_TEXCOORD1:
-            cg->prg[i].lut_tex = param;
-            break;
-      }
+      else if (string_is_equal(semantic, "POSITION"))
+         cg->prg[i].vertex  = param;
+      else if (string_is_equal(semantic, "TEXCOORD1"))
+         cg->prg[i].lut_tex = param;
    }
 
    if (!cg->prg[i].tex)
@@ -1062,10 +1053,50 @@ static void gl_cg_set_program_attributes(void *data, unsigned i)
    }
 }
 
+static void gl_cg_init_menu_shaders(void *data)
+{
+   struct shader_program_info shader_prog_info;
+   cg_shader_data_t *cg = (cg_shader_data_t*)data;
+
+   if (!cg)
+      return;
+
+#ifdef HAVE_SHADERPIPELINE
+   shader_prog_info.combined = stock_xmb_ribbon_simple;
+   shader_prog_info.is_file  = false;
+
+   gl_cg_compile_program(
+         cg,
+         VIDEO_SHADER_MENU,
+         &cg->prg[VIDEO_SHADER_MENU],
+         &shader_prog_info);
+   gl_cg_set_program_base_attrib(cg, VIDEO_SHADER_MENU);
+
+   shader_prog_info.combined = stock_xmb_ribbon_simple;
+   shader_prog_info.is_file  = false;
+
+   gl_cg_compile_program(
+         cg,
+         VIDEO_SHADER_MENU_2,
+         &cg->prg[VIDEO_SHADER_MENU_2],
+         &shader_prog_info);
+   gl_cg_set_program_base_attrib(cg, VIDEO_SHADER_MENU_2);
+
+   shader_prog_info.combined = stock_xmb_snow;
+   shader_prog_info.is_file  = false;
+
+   gl_cg_compile_program(
+         cg,
+         VIDEO_SHADER_MENU_3,
+         &cg->prg[VIDEO_SHADER_MENU_3],
+         &shader_prog_info);
+   gl_cg_set_program_base_attrib(cg, VIDEO_SHADER_MENU_3);
+#endif
+}
+
 static void *gl_cg_init(void *data, const char *path)
 {
    unsigned i;
-   struct shader_program_info shader_prog_info;
    cg_shader_data_t *cg = (cg_shader_data_t*)
       calloc(1, sizeof(cg_shader_data_t));
 
@@ -1110,7 +1141,7 @@ static void *gl_cg_init(void *data, const char *path)
    memset(cg->alias_define, 0, sizeof(cg->alias_define));
 
    if (    !string_is_empty(path)
-         && string_is_equal_fast(path_get_extension(path), "cgp", 3))
+         && string_is_equal(path_get_extension(path), "cgp"))
    {
       if (!gl_cg_load_preset(cg, path))
          goto error;
@@ -1138,37 +1169,6 @@ static void *gl_cg_init(void *data, const char *path)
 
    gl_cg_set_shaders(cg->prg[1].fprg, cg->prg[1].vprg);
 
-#ifdef HAVE_SHADERPIPELINE
-   shader_prog_info.combined = stock_xmb_ribbon_simple;
-   shader_prog_info.is_file  = false;
-
-   gl_cg_compile_program(
-         cg,
-         VIDEO_SHADER_MENU,
-         &cg->prg[VIDEO_SHADER_MENU],
-         &shader_prog_info);
-   gl_cg_set_program_base_attrib(cg, VIDEO_SHADER_MENU);
-
-   shader_prog_info.combined = stock_xmb_ribbon_simple;
-   shader_prog_info.is_file  = false;
-
-   gl_cg_compile_program(
-         cg,
-         VIDEO_SHADER_MENU_2,
-         &cg->prg[VIDEO_SHADER_MENU_2],
-         &shader_prog_info);
-   gl_cg_set_program_base_attrib(cg, VIDEO_SHADER_MENU_2);
-
-   shader_prog_info.combined = stock_xmb_snow;
-   shader_prog_info.is_file  = false;
-
-   gl_cg_compile_program(
-         cg,
-         VIDEO_SHADER_MENU_3,
-         &cg->prg[VIDEO_SHADER_MENU_3],
-         &shader_prog_info);
-   gl_cg_set_program_base_attrib(cg, VIDEO_SHADER_MENU_3);
-#endif
 
    gl_cg_reset_attrib(cg);
 
@@ -1280,6 +1280,7 @@ static struct video_shader *gl_cg_get_current_shader(void *data)
 
 const shader_backend_t gl_cg_backend = {
    gl_cg_init,
+   gl_cg_init_menu_shaders,
    gl_cg_deinit,
    gl_cg_set_params,
    gl_cg_set_uniform_parameter,

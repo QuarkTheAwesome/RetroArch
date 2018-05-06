@@ -31,6 +31,7 @@ static unsigned uint_user_language;
 
 int menu_hash_get_help_enum(enum msg_hash_enums msg, char *s, size_t len)
 {
+#ifdef HAVE_MENU
    int ret = -1;
 
 #ifdef HAVE_LANGEXTRA
@@ -78,6 +79,9 @@ int menu_hash_get_help_enum(enum msg_hash_enums msg, char *s, size_t len)
       case RETRO_LANGUAGE_CHINESE_TRADITIONAL:
          ret = menu_hash_get_help_cht_enum(msg, s, len);
          break;
+      case RETRO_LANGUAGE_ARABIC:
+         ret = menu_hash_get_help_ar_enum(msg, s, len);
+         break;
       default:
          break;
    }
@@ -87,6 +91,9 @@ int menu_hash_get_help_enum(enum msg_hash_enums msg, char *s, size_t len)
       return ret;
 
    return menu_hash_get_help_us_enum(msg, s, len);
+#else
+   return 0;
+#endif
 }
 
 const char *msg_hash_to_str(enum msg_hash_enums msg)
@@ -140,6 +147,9 @@ const char *msg_hash_to_str(enum msg_hash_enums msg)
          break;
       case RETRO_LANGUAGE_CHINESE_TRADITIONAL:
          ret = msg_hash_to_str_cht(msg);
+         break;
+      case RETRO_LANGUAGE_ARABIC:
+         ret = msg_hash_to_str_ar(msg);
          break;
       default:
          break;

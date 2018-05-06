@@ -33,12 +33,14 @@
 
 #include "wiiu_dbg.h"
 
+#ifdef WIIU_HID
+#define MAX_PADS 16
+#else
 #define MAX_PADS 5
+#endif
 
-static unsigned char keyboardChannel = 0x00;
-static KBDModifier keyboardModifier  = 0x00;
-static unsigned char keyboardCode    = 0x00;
-static KEYState keyboardState[256]   = { KBD_WIIU_NULL };
+static uint8_t keyboardChannel = 0x00;
+static bool keyboardState[RETROK_LAST] = { 0 };
 
 typedef struct wiiu_input
 {
@@ -62,14 +64,13 @@ void kb_key_callback(KBDKeyEvent *key)
    unsigned code       = 0;
    bool pressed        = false;
 
-   keyboardModifier    = key->modifier;
-   keyboardCode        = key->scancode;
-
    if (key->state > 0)
       pressed = true;
 
    code                = input_keymaps_translate_keysym_to_rk(key->scancode);
-   keyboardState[code] = key->state;
+   if (code < RETROK_LAST)
+      keyboardState[code] = pressed;
+
 
    if (key->modifier & KBD_WIIU_SHIFT)
       mod |= RETROKMOD_SHIFT;
@@ -103,9 +104,9 @@ static int16_t wiiu_pointer_device_state(wiiu_input_t* wiiu, unsigned id)
 	{
 		case RETRO_DEVICE_ID_POINTER_PRESSED:
 		{
-			retro_bits_t state;
+			input_bits_t state;
 			wiiu->joypad->get_buttons(0, &state);
-			return BIT256_GET(state, VPAD_BUTTON_TOUCH) ? 1 : 0;
+			return BIT256_GET(state, VPAD_BUTTON_TOUCH_BIT) ? 1 : 0;
 		}
 		case RETRO_DEVICE_ID_POINTER_X:
 			return wiiu->joypad->axis(0, 0xFFFF0004UL);
@@ -134,7 +135,7 @@ static bool wiiu_key_pressed(int key)
    if (key >= RETROK_LAST)
       return false;
 
-   if ((keyboardState[key] > 0) && (keyboardChannel > 0))
+   if (keyboardState[key] && (keyboardChannel > 0))
       ret = true;
 
    return ret;

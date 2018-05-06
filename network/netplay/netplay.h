@@ -29,10 +29,19 @@
 
 typedef struct netplay netplay_t;
 
+typedef struct mitm_server {
+   const char *name;
+   const char *description;
+} mitm_server_t;
+
+static const mitm_server_t netplay_mitm_server_list[] = {
+   { "nyc", "New York City, USA" },
+   { "madrid", "Madrid, Spain" },
+};
+
 enum rarch_netplay_ctl_state
 {
    RARCH_NETPLAY_CTL_NONE = 0,
-   RARCH_NETPLAY_CTL_FLIP_PLAYERS,
    RARCH_NETPLAY_CTL_GAME_WATCH,
    RARCH_NETPLAY_CTL_POST_FRAME,
    RARCH_NETPLAY_CTL_PRE_FRAME,
@@ -51,6 +60,27 @@ enum rarch_netplay_ctl_state
    RARCH_NETPLAY_CTL_FINISHED_NAT_TRAVERSAL,
    RARCH_NETPLAY_CTL_DESYNC_PUSH,
    RARCH_NETPLAY_CTL_DESYNC_POP
+};
+
+/* Preferences for sharing digital devices */
+enum rarch_netplay_share_digital_preference
+{
+   RARCH_NETPLAY_SHARE_DIGITAL_NO_SHARING,
+   RARCH_NETPLAY_SHARE_DIGITAL_NO_PREFERENCE,
+   RARCH_NETPLAY_SHARE_DIGITAL_OR,
+   RARCH_NETPLAY_SHARE_DIGITAL_XOR,
+   RARCH_NETPLAY_SHARE_DIGITAL_VOTE,
+   RARCH_NETPLAY_SHARE_DIGITAL_LAST
+};
+
+/* Preferences for sharing analog devices */
+enum rarch_netplay_share_analog_preference
+{
+   RARCH_NETPLAY_SHARE_ANALOG_NO_SHARING,
+   RARCH_NETPLAY_SHARE_ANALOG_NO_PREFERENCE,
+   RARCH_NETPLAY_SHARE_ANALOG_MAX,
+   RARCH_NETPLAY_SHARE_ANALOG_AVERAGE,
+   RARCH_NETPLAY_SHARE_ANALOG_LAST
 };
 
 int16_t input_state_net(unsigned port, unsigned device,

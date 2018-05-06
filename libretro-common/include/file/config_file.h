@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2017 The RetroArch team
+/* Copyright  (C) 2010-2018 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (config_file.h).
@@ -51,6 +51,17 @@ RETRO_BEGIN_DECLS
    if (config_get_float(conf, key, &tmp)) \
       base->var = tmp; \
 } while(0)
+
+struct config_file
+{
+   char *path;
+   struct config_entry_list *entries;
+   struct config_entry_list *tail;
+   unsigned include_depth;
+
+   struct config_include_list *includes;
+};
+
 
 typedef struct config_file config_file_t;
 

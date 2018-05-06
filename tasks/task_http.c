@@ -249,6 +249,7 @@ static void* task_push_http_transfer_generic(
 {
    task_finder_data_t find_data;
    char tmp[255];
+   const char* s = NULL;
    retro_task_t  *t               = NULL;
    http_handle_t *http            = NULL;
 
@@ -297,8 +298,19 @@ static void* task_push_http_transfer_generic(
    t->user_data            = user_data;
    t->progress             = -1;
 
+   if (user_data != NULL)
+      s = ((file_transfer_t*)user_data)->path;
+   else
+      s = url;
+
+   if (strstr(s, ".index"))
+   {
+      snprintf(tmp, sizeof(tmp), "%s %s",
+            msg_hash_to_str(MSG_DOWNLOADING), msg_hash_to_str(MSG_INDEX_FILE));
+   }
+   else
    snprintf(tmp, sizeof(tmp), "%s '%s'",
-         msg_hash_to_str(MSG_DOWNLOADING), path_basename(url));
+         msg_hash_to_str(MSG_DOWNLOADING), s);
 
    t->title                = strdup(tmp);
 

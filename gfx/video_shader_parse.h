@@ -42,6 +42,11 @@ RETRO_BEGIN_DECLS
 #define GFX_MAX_PARAMETERS 128
 #endif
 
+#ifndef GFX_MAX_FRAME_HISTORY
+#define GFX_MAX_FRAME_HISTORY 128
+#endif
+
+
 enum rarch_shader_type
 {
    RARCH_SHADER_NONE = 0,
@@ -62,7 +67,8 @@ enum
 {
    RARCH_FILTER_UNSPEC = 0,
    RARCH_FILTER_LINEAR,
-   RARCH_FILTER_NEAREST
+   RARCH_FILTER_NEAREST,
+   RARCH_FILTER_MAX
 };
 
 enum gfx_wrap_type
@@ -72,7 +78,8 @@ enum gfx_wrap_type
    RARCH_WRAP_DEFAULT = RARCH_WRAP_BORDER,
    RARCH_WRAP_EDGE,
    RARCH_WRAP_REPEAT,
-   RARCH_WRAP_MIRRORED_REPEAT
+   RARCH_WRAP_MIRRORED_REPEAT,
+   RARCH_WRAP_MAX
 };
 
 struct gfx_fbo_scale
@@ -117,6 +124,7 @@ struct video_shader_pass
    bool mipmap;
    unsigned filter;
    unsigned frame_count_mod;
+   bool feedback;
 };
 
 struct video_shader_lut
@@ -148,6 +156,7 @@ struct video_shader
    /* If < 0, no feedback pass is used. Otherwise,
     * the FBO after pass #N is passed a texture to next frame. */
    int feedback_pass;
+   int history_size;
 
    struct video_shader_pass pass[GFX_MAX_SHADERS];
 
@@ -229,6 +238,15 @@ bool video_shader_resolve_parameters(config_file_t *conf,
  **/
 enum rarch_shader_type video_shader_parse_type(const char *path,
       enum rarch_shader_type fallback);
+
+enum rarch_shader_type video_shader_get_type_from_ext(
+      const char *ext, bool *is_preset);
+
+bool video_shader_is_supported(enum rarch_shader_type type);
+
+bool video_shader_any_supported(void);
+
+bool video_shader_check_for_changes(void);
 
 RETRO_END_DECLS
 

@@ -58,6 +58,7 @@ typedef struct gfx_ctx_wayland_data
    unsigned height;
    unsigned physical_width;
    unsigned physical_height;
+   int refresh_rate;
    struct wl_registry *registry;
    struct wl_compositor *compositor;
    struct wl_surface *surface;
@@ -440,6 +441,7 @@ static void display_handle_mode(void *data,
    gfx_ctx_wayland_data_t *wl = (gfx_ctx_wayland_data_t*)data;
    wl->width                  = width;
    wl->height                 = height;
+   wl->refresh_rate           = refresh;
 
    /* Certain older Wayland implementations report in Hz,
     * but it should be mHz. */
@@ -545,7 +547,7 @@ static void gfx_ctx_wl_destroy_resources(gfx_ctx_wayland_data_t *wl)
 #ifdef HAVE_VULKAN
          vulkan_context_destroy(&wl->vk, wl->surface);
 
-         if (wl->input.fd >= 0)
+         if (wl->input.dpy != NULL && wl->input.fd >= 0)
             close(wl->input.fd);
 #endif
          break;
@@ -1198,6 +1200,11 @@ static bool gfx_ctx_wl_has_windowed(void *data)
    return true;
 }
 
+static enum gfx_ctx_api gfx_ctx_wl_get_api(void *data)
+{
+   return wl_api;
+}
+
 static bool gfx_ctx_wl_bind_api(void *video_driver,
       enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
@@ -1205,6 +1212,7 @@ static bool gfx_ctx_wl_bind_api(void *video_driver,
    g_egl_major = major;
    g_egl_minor = minor;
 #endif
+   wl_api      = api;
 
    switch (api)
    {
@@ -1214,7 +1222,6 @@ static bool gfx_ctx_wl_bind_api(void *video_driver,
          if ((major * 1000 + minor) >= 3001)
             return false;
 #endif
-         wl_api = api;
          return eglBindAPI(EGL_OPENGL_API);
 #else
          break;
@@ -1225,21 +1232,18 @@ static bool gfx_ctx_wl_bind_api(void *video_driver,
          if (major >= 3)
             return false;
 #endif
-         wl_api = api;
          return eglBindAPI(EGL_OPENGL_ES_API);
 #else
          break;
 #endif
       case GFX_CTX_OPENVG_API:
 #ifdef HAVE_VG
-         wl_api = api;
          return eglBindAPI(EGL_OPENVG_API);
 #else
          break;
 #endif
       case GFX_CTX_VULKAN_API:
 #ifdef HAVE_VULKAN
-         wl_api = api;
          return true;
 #else
          break;
@@ -1367,13 +1371,22 @@ static void gfx_ctx_wl_show_mouse(void *data, bool state)
    wl->cursor.visible = state;
 }
 
+static float gfx_ctx_wl_get_refresh_rate(void *data)
+{
+   gfx_ctx_wayland_data_t *wl = (gfx_ctx_wayland_data_t*)data;
+
+   return (float) wl->refresh_rate / 1000.0f;
+}
+
 const gfx_ctx_driver_t gfx_ctx_wayland = {
    gfx_ctx_wl_init,
    gfx_ctx_wl_destroy,
+   gfx_ctx_wl_get_api,
    gfx_ctx_wl_bind_api,
    gfx_ctx_wl_set_swap_interval,
    gfx_ctx_wl_set_video_mode,
    gfx_ctx_wl_get_video_size,
+   gfx_ctx_wl_get_refresh_rate,
    NULL, /* get_video_output_size */
    NULL, /* get_video_output_prev */
    NULL, /* get_video_output_next */

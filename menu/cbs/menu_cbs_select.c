@@ -122,7 +122,6 @@ static int action_select_core_setting(const char *path, const char *label, unsig
    return core_setting_right(type, label, true);
 }
 
-#ifdef HAVE_SHADER_MANAGER
 static int shader_action_parameter_select(const char *path, const char *label, unsigned type,
       size_t idx)
 {
@@ -132,9 +131,8 @@ static int shader_action_parameter_select(const char *path, const char *label, u
 static int shader_action_parameter_preset_select(const char *path, const char *label, unsigned type,
       size_t idx)
 {
-   return shader_action_parameter_preset_right(type, label, true);
+   return shader_action_parameter_right(type, label, true);
 }
-#endif
 
 static int action_select_cheat(const char *path, const char *label, unsigned type,
       size_t idx)
@@ -148,14 +146,12 @@ static int action_select_input_desc(const char *path, const char *label, unsigne
    return action_right_input_desc(type, label, true);
 }
 
-#ifdef HAVE_KEYMAPPER
 static int action_select_input_desc_kbd(const char *path,
       const char *label, unsigned type,
    size_t idx)
 {
    return action_right_input_desc_kbd(type, label, true);
 }
-#endif
 
 #ifdef HAVE_NETWORKING
 static int action_select_netplay_connect_room(const char *path,
@@ -210,7 +206,6 @@ static int menu_cbs_init_bind_select_compare_type(
    {
       BIND_ACTION_SELECT(cbs, action_select_cheat);
    }
-#ifdef HAVE_SHADER_MANAGER
    else if (type >= MENU_SETTINGS_SHADER_PARAMETER_0
          && type <= MENU_SETTINGS_SHADER_PARAMETER_LAST)
    {
@@ -221,19 +216,16 @@ static int menu_cbs_init_bind_select_compare_type(
    {
       BIND_ACTION_SELECT(cbs, shader_action_parameter_preset_select);
    }
-#endif
    else if (type >= MENU_SETTINGS_INPUT_DESC_BEGIN
          && type <= MENU_SETTINGS_INPUT_DESC_END)
    {
       BIND_ACTION_SELECT(cbs, action_select_input_desc);
    }
-#ifdef HAVE_KEYMAPPER
    else if (type >= MENU_SETTINGS_INPUT_DESC_KBD_BEGIN
          && type <= MENU_SETTINGS_INPUT_DESC_KBD_END)
    {
       BIND_ACTION_SELECT(cbs, action_select_input_desc_kbd);
    }
-#endif
    else
    {
 

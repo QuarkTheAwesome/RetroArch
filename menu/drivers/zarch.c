@@ -729,7 +729,9 @@ static int zarch_zui_render_lay_root_downloads(
 static int zarch_zui_render_lay_root(video_frame_info_t *video_info,
       zui_t *zui)
 {
+#ifdef ZARCH_DEBUG
    char item[PATH_MAX_LENGTH];
+#endif
    static struct zui_tabbed tabbed = {~0U};
 
    zarch_zui_tabbed_begin(zui, &tabbed, 0, 0);
@@ -949,7 +951,7 @@ static void zarch_frame(void *data, video_frame_info_t *video_info)
    else if (zui->item.active == 0)
       zui->item.active = -1;
 
-   menu_display_blend_begin();
+   menu_display_blend_begin(video_info);
 
    draw.x           = 0;
    draw.y           = 0;
@@ -961,8 +963,8 @@ static void zarch_frame(void *data, video_frame_info_t *video_info)
    draw.prim_type   = MENU_DISPLAY_PRIM_TRIANGLES;
    draw.pipeline.id = 0;
 
-   menu_display_draw(&draw);
-   menu_display_blend_end();
+   menu_display_draw(&draw, video_info);
+   menu_display_blend_end(video_info);
 
    memset(&draw, 0, sizeof(menu_display_ctx_draw_t));
 
@@ -982,14 +984,14 @@ static void zarch_frame(void *data, video_frame_info_t *video_info)
    if (!video_info->libretro_running && draw.texture)
       draw.color           = &coord_color2[0];
 
-   menu_display_blend_begin();
+   menu_display_blend_begin(video_info);
    draw.x              = 0;
    draw.y              = 0;
 
    menu_display_draw_bg(&draw, video_info, false,
          video_info->menu_wallpaper_opacity);
-   menu_display_draw(&draw);
-   menu_display_blend_end();
+   menu_display_draw(&draw, video_info);
+   menu_display_blend_end(video_info);
 
    zui->rendering = false;
 
@@ -1082,7 +1084,7 @@ static bool zarch_load_image(void *userdata,
                &zui->textures.bg);
          break;
       case MENU_IMAGE_THUMBNAIL:
-         break;
+      case MENU_IMAGE_LEFT_THUMBNAIL:
       case MENU_IMAGE_SAVESTATE_THUMBNAIL:
          /* TODO/FIXME -implement */
          break;
@@ -1140,7 +1142,7 @@ static bool zarch_menu_init_list(void *data)
    file_list_t *menu_stack      = menu_entries_get_menu_stack_ptr(0);
    file_list_t *selection_buf   = menu_entries_get_selection_buf_ptr(0);
 
-   menu_displaylist_info_free(&info);
+   menu_displaylist_info_init(&info);
 
    info.label    = strdup(
          msg_hash_to_str(MENU_ENUM_LABEL_HISTORY_TAB));

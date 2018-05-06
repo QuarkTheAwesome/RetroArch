@@ -48,9 +48,9 @@ static const float vk_colors[] = {
    1.0f, 1.0f, 1.0f, 1.0f,
 };
 
-static void *menu_display_vk_get_default_mvp(void)
+static void *menu_display_vk_get_default_mvp(video_frame_info_t *video_info)
 {
-   vk_t *vk = (vk_t*)video_driver_get_ptr(false);
+   vk_t *vk = video_info ? (vk_t*)video_info->userdata : NULL;
    if (!vk)
       return NULL;
    return &vk->mvp_no_rot;
@@ -99,10 +99,12 @@ static unsigned to_menu_pipeline(
 }
 #endif
 
-static void menu_display_vk_viewport(void *data)
+static void menu_display_vk_viewport(void *data,
+      video_frame_info_t *video_info)
 {
    menu_display_ctx_draw_t *draw = (menu_display_ctx_draw_t*)data;
-   vk_t *vk                      = (vk_t*)video_driver_get_ptr(false);
+   vk_t *vk                      = video_info ? (vk_t*)video_info->userdata 
+      : NULL;
 
    if (!vk || !draw)
       return;
@@ -115,13 +117,13 @@ static void menu_display_vk_viewport(void *data)
    vk->vk_vp.maxDepth = 1.0f;
 }
 
-static void menu_display_vk_draw_pipeline(void *data)
+static void menu_display_vk_draw_pipeline(void *data, video_frame_info_t *video_info)
 {
 #ifdef HAVE_SHADERPIPELINE
    float output_size[2];
    menu_display_ctx_draw_t *draw = (menu_display_ctx_draw_t*)data;
-   vk_t *vk                      = (vk_t*)video_driver_get_ptr(false);
    video_coord_array_t *ca       = NULL;
+   vk_t *vk                      = video_info ? (vk_t*)video_info->userdata : NULL;
 
    static uint8_t ubo_scratch_data[768];
    static float t                = 0.0f;
@@ -160,8 +162,12 @@ static void menu_display_vk_draw_pipeline(void *data)
          draw->pipeline.backend_data_size = sizeof(math_matrix_4x4) + 3 * sizeof(float);
 
          /* Match UBO layout in shader. */
-         memcpy(ubo_scratch_data, menu_display_vk_get_default_mvp(), sizeof(math_matrix_4x4));
-         memcpy(ubo_scratch_data + sizeof(math_matrix_4x4), output_size, sizeof(output_size));
+         memcpy(ubo_scratch_data,
+               menu_display_vk_get_default_mvp(video_info),
+               sizeof(math_matrix_4x4));
+         memcpy(ubo_scratch_data + sizeof(math_matrix_4x4),
+               output_size,
+               sizeof(output_size));
          memcpy(ubo_scratch_data + sizeof(math_matrix_4x4) + 2 * sizeof(float), &t, sizeof(t));
          draw->coords = &blank_coords;
          blank_coords.vertices = 4;
@@ -173,7 +179,7 @@ static void menu_display_vk_draw_pipeline(void *data)
 #endif
 }
 
-static void menu_display_vk_draw(void *data)
+static void menu_display_vk_draw(void *data, video_frame_info_t *video_info)
 {
    unsigned i;
    struct vk_buffer_range range;
@@ -183,7 +189,7 @@ static void menu_display_vk_draw(void *data)
    const float *color            = NULL;
    struct vk_vertex *pv          = NULL;
    menu_display_ctx_draw_t *draw = (menu_display_ctx_draw_t*)data;
-   vk_t *vk                      = (vk_t*)video_driver_get_ptr(false);
+   vk_t *vk                      = video_info ? (vk_t*)video_info->userdata : NULL;
 
    if (!vk || !draw)
       return;
@@ -204,7 +210,8 @@ static void menu_display_vk_draw(void *data)
    if (!color)
       color           = menu_display_vk_get_default_color();
 
-   menu_display_vk_viewport(draw);
+   menu_display_vk_viewport(draw, video_info);
+
    vk->tracker.dirty |= VULKAN_DIRTY_DYNAMIC_BIT;
 
    /* Bake interleaved VBO. Kinda ugly, we should probably try to move to
@@ -266,7 +273,7 @@ static void menu_display_vk_draw(void *data)
             (texture->default_smooth ? vk->samplers.linear
              : vk->samplers.nearest);
          call.uniform      = draw->matrix_data
-            ? draw->matrix_data : menu_display_vk_get_default_mvp();
+            ? draw->matrix_data : menu_display_vk_get_default_mvp(video_info);
          call.uniform_size = sizeof(math_matrix_4x4);
          call.vbo          = &range;
          call.vertices     = draw->coords->vertices;
@@ -282,11 +289,12 @@ static void menu_display_vk_restore_clear_color(void)
 }
 
 static void menu_display_vk_clear_color(
-      menu_display_ctx_clearcolor_t *clearcolor)
+      menu_display_ctx_clearcolor_t *clearcolor,
+      video_frame_info_t *video_info)
 {
    VkClearRect rect;
    VkClearAttachment attachment;
-   vk_t *vk                      = (vk_t*)video_driver_get_ptr(false);
+   vk_t *vk = video_info ? (vk_t*)video_info->userdata : NULL;
    if (!vk || !clearcolor)
       return;
 
@@ -306,16 +314,20 @@ static void menu_display_vk_clear_color(
    vkCmdClearAttachments(vk->cmd, 1, &attachment, 1, &rect);
 }
 
-static void menu_display_vk_blend_begin(void)
+static void menu_display_vk_blend_begin(video_frame_info_t *video_info)
 {
-   vk_t *vk = (vk_t*)video_driver_get_ptr(false);
-   vk->display.blend = true;
+   vk_t *vk = video_info ? (vk_t*)video_info->userdata : NULL;
+
+   if (vk)
+      vk->display.blend = true;
 }
 
-static void menu_display_vk_blend_end(void)
+static void menu_display_vk_blend_end(video_frame_info_t *video_info)
 {
-   vk_t *vk = (vk_t*)video_driver_get_ptr(false);
-   vk->display.blend = false;
+   vk_t *vk = video_info ? (vk_t*)video_info->userdata : NULL;
+
+   if (vk)
+      vk->display.blend = false;
 }
 
 static bool menu_display_vk_font_init_first(
@@ -348,4 +360,5 @@ menu_display_ctx_driver_t menu_display_ctx_vulkan = {
    menu_display_vk_font_init_first,
    MENU_VIDEO_DRIVER_VULKAN,
    "menu_display_vulkan",
+   false
 };

@@ -38,6 +38,20 @@ End of setup
 
 #define CHEEVOS_TAG "[CHEEVOS]: "
 
+#ifdef CHEEVOS_VERBOSE
+
+#define CHEEVOS_LOG RARCH_LOG
+#define CHEEVOS_ERR RARCH_ERR
+
+#else
+
+void cheevos_log(const char *fmt, ...);
+
+#define CHEEVOS_LOG cheevos_log
+#define CHEEVOS_ERR cheevos_log
+
+#endif
+
 typedef struct cheevos_ctx_desc
 {
    unsigned idx;
@@ -64,7 +78,7 @@ typedef enum
    CHEEVOS_CONSOLE_PLAYSTATION     = 12,
    CHEEVOS_CONSOLE_ATARI_LYNX      = 13,
    CHEEVOS_CONSOLE_NEOGEO_POCKET   = 14,
-   CHEEVOS_CONSOLE_XBOX_360        = 15,
+   CHEEVOS_CONSOLE_GAME_GEAR       = 15,
    CHEEVOS_CONSOLE_GAMECUBE        = 16,
    CHEEVOS_CONSOLE_ATARI_JAGUAR    = 17,
    CHEEVOS_CONSOLE_NINTENDO_DS     = 18,

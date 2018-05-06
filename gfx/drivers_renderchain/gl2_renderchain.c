@@ -377,7 +377,7 @@ static void gl2_renderchain_render(
       shader_info.idx        = i + 1;
       shader_info.set_active = true;
 
-      video_shader_driver_use(shader_info);
+      video_shader_driver_use(&shader_info);
       glBindTexture(GL_TEXTURE_2D, chain->fbo_texture[i - 1]);
 
       mip_level = i + 1;
@@ -406,7 +406,7 @@ static void gl2_renderchain_render(
       params.fbo_info      = fbo_tex_info;
       params.fbo_info_cnt  = fbo_tex_info_cnt;
 
-      video_shader_driver_set_parameters(params);
+      video_shader_driver_set_parameters(&params);
 
       gl->coords.vertices = 4;
 
@@ -451,7 +451,7 @@ static void gl2_renderchain_render(
    shader_info.idx        = chain->fbo_pass + 1;
    shader_info.set_active = true;
 
-   video_shader_driver_use(shader_info);
+   video_shader_driver_use(&shader_info);
 
    glBindTexture(GL_TEXTURE_2D, chain->fbo_texture[chain->fbo_pass - 1]);
 
@@ -479,7 +479,7 @@ static void gl2_renderchain_render(
    params.fbo_info      = fbo_tex_info;
    params.fbo_info_cnt  = fbo_tex_info_cnt;
 
-   video_shader_driver_set_parameters(params);
+   video_shader_driver_set_parameters(&params);
 
    gl->coords.vertex    = gl->vertex_ptr;
 
@@ -504,27 +504,30 @@ static void gl2_renderchain_deinit_fbo(void *data,
    gl_t *gl                 = (gl_t*)data;
    gl2_renderchain_t *chain = (gl2_renderchain_t*)chain_data;
 
-   if (!gl)
-      return;
+   if (gl)
+   {
+      if (gl->fbo_feedback)
+         gl2_delete_fb(1, &gl->fbo_feedback);
+      if (gl->fbo_feedback_texture)
+         glDeleteTextures(1, &gl->fbo_feedback_texture);
 
-   glDeleteTextures(chain->fbo_pass, chain->fbo_texture);
-   gl2_delete_fb(chain->fbo_pass, chain->fbo);
+      gl->fbo_inited           = false;
+      gl->fbo_feedback_enable  = false;
+      gl->fbo_feedback_pass    = 0;
+      gl->fbo_feedback_texture = 0;
+      gl->fbo_feedback         = 0;
+   }
 
-   memset(chain->fbo_texture, 0, sizeof(chain->fbo_texture));
-   memset(chain->fbo,         0, sizeof(chain->fbo));
+   if (chain)
+   {
+      gl2_delete_fb(chain->fbo_pass, chain->fbo);
+      glDeleteTextures(chain->fbo_pass, chain->fbo_texture);
 
-   if (gl->fbo_feedback)
-      gl2_delete_fb(1, &gl->fbo_feedback);
-   if (gl->fbo_feedback_texture)
-      glDeleteTextures(1, &gl->fbo_feedback_texture);
+      memset(chain->fbo_texture, 0, sizeof(chain->fbo_texture));
+      memset(chain->fbo,         0, sizeof(chain->fbo));
 
-   chain->fbo_pass          = 0;
-
-   gl->fbo_inited           = false;
-   gl->fbo_feedback_enable  = false;
-   gl->fbo_feedback_pass    = 0;
-   gl->fbo_feedback_texture = 0;
-   gl->fbo_feedback         = 0;
+      chain->fbo_pass          = 0;
+   }
 }
 
 static void gl2_renderchain_deinit_hw_render(
@@ -711,10 +714,9 @@ static void gl_create_fbo_texture(gl_t *gl,
    }
 }
 
-static void gl_create_fbo_textures(gl_t *gl, void *chain_data)
+static void gl_create_fbo_textures(gl_t *gl, gl2_renderchain_t *chain)
 {
    int i;
-   gl2_renderchain_t *chain = (gl2_renderchain_t*)chain_data;
 
    glGenTextures(chain->fbo_pass, chain->fbo_texture);
 
@@ -1038,8 +1040,8 @@ static bool gl2_renderchain_init_hw_render(
       status = gl2_check_fb_status(RARCH_GL_FRAMEBUFFER);
       if (status != RARCH_GL_FRAMEBUFFER_COMPLETE)
       {
-         RARCH_ERR("[GL]: Failed to create HW render FBO #%u, error: 0x%u.\n",
-               i, (unsigned)status);
+         RARCH_ERR("[GL]: Failed to create HW render FBO #%u, error: 0x%04x.\n",
+               i, status);
          return false;
       }
    }
