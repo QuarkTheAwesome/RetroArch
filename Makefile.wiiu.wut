@@ -131,6 +131,8 @@ LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -L$(ROOT_DIR) $(WHOLE_START) -lretro_wiiu $(WHOLE_END)
 LDFLAGS += -L$(DEVKITPRO)/portlibs/ppc/lib
 LDFLAGS += -lm -lpng -lz
+LDFLAGS += -lsndcore2 -lgx2 -lnsysnet -lvpad -lpadscore -lproc_ui -lnsyskbd
+LDFLAGS += -lnsyshid -lnn_ac -lsysapp
 
 ifneq ($(WANT_LIBFAT), 1)
 	LDFLAGS += -lfat
