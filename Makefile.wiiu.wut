@@ -1,0 +1,188 @@
+TARGET := retroarch_wiiu
+
+DEBUG ?= 0
+GRIFFIN_BUILD ?= 0
+SALAMANDER_BUILD ?= 0
+BUILD_DIR ?= objs/wiiu
+PC_DEVELOPMENT_TCP_PORT ?=
+
+ifeq ($(SALAMANDER_BUILD),1)
+	BUILD_DIR := $(BUILD_DIR)-salamander
+	TARGET := $(TARGET)_salamander
+else ifeq ($(GRIFFIN_BUILD),1)
+endif
+
+ifeq ($(DEBUG),1)
+	BUILD_DIR := $(BUILD_DIR)-debug
+endif
+
+DEFINES :=
+OBJ :=
+OBJ += wiiu/main.o
+OBJ += wiiu/system/memory.o
+OBJ += wiiu/system/atomic.o
+OBJ += wiiu/system/exception_handler.o
+OBJ += wiiu/system/missing_libc_functions.o
+OBJ += wiiu/fs/fs_utils.o
+OBJ += wiiu/hbl.o
+
+ifeq (1,0)
+else
+	DEFINES += -DRARCH_INTERNAL
+	DEFINES += -DHAVE_KEYMAPPER
+	DEFINES += -DHAVE_UPDATE_ASSETS
+	DEFINES += -DHAVE_FILTERS_BUILTIN
+	DEFINES += -DHAVE_SLANG
+	DEFINES += -DHAVE_SHADERPIPELINE
+
+	OBJ += wiiu/shader_utils.o
+	OBJ += gfx/drivers/gx2_shaders/tex.o
+	OBJ += gfx/drivers/gx2_shaders/sprite.o
+	OBJ += gfx/drivers/gx2_shaders/frame.o
+	OBJ += gfx/drivers/gx2_shaders/ribbon.o
+	OBJ += gfx/drivers/gx2_shaders/ribbon_simple.o
+	OBJ += gfx/drivers/gx2_shaders/bokeh.o
+	OBJ += gfx/drivers/gx2_shaders/snow.o
+	OBJ += gfx/drivers/gx2_shaders/snow_simple.o
+	OBJ += gfx/drivers/gx2_shaders/snowflake.o
+	OBJ += gfx/drivers_shader/slang_preprocess.o
+	OBJ += gfx/drivers_shader/glslang_util.o
+
+	ifeq ($(GRIFFIN_BUILD),1)
+	else
+		HAVE_MENU_COMMON = 1
+		HAVE_RTGA = 1
+		HAVE_RPNG = 1
+		HAVE_RJPEG = 1
+		HAVE_RBMP = 1
+		HAVE_RGUI = 1
+		HAVE_ZLIB = 1
+		HAVE_7ZIP = 1
+		HAVE_BUILTINZLIB = 0
+		HAVE_LIBRETRODB = 1
+		HAVE_ZARCH = 0
+		HAVE_MATERIALUI = 1
+		HAVE_XMB = 1
+		HAVE_STB_FONT = 1
+#		HAVE_FREETYPE = 1
+		HAVE_LANGEXTRA = 1
+		HAVE_LIBRETRODB = 1
+		HAVE_NETWORKING = 1
+		HAVE_CHEEVOS = 1
+#		WANT_IFADDRS = 1
+		HAVE_OVERLAY = 1
+		HAVE_STATIC_VIDEO_FILTERS = 1
+		HAVE_STATIC_AUDIO_FILTERS = 1
+		WANT_LIBFAT = 1
+		WANT_IOSUHAX = 1
+
+		include Makefile.common
+		BLACKLIST := $(LIBRETRO_COMM_DIR)/net/net_ifinfo.o
+		OBJ := $(filter-out $(BLACKLIST),$(OBJ))
+
+		OBJ += gfx/drivers/gx2_gfx.o
+		OBJ += gfx/drivers_font/wiiu_font.o
+		OBJ += menu/drivers_display/menu_display_wiiu.o
+		OBJ += input/drivers/wiiu_input.o
+		OBJ += input/drivers_joypad/wiiu_joypad.o
+		OBJ += input/drivers_joypad/wiiu/wpad_driver.o
+		OBJ += input/drivers_joypad/wiiu/kpad_driver.o
+		OBJ += input/drivers_joypad/wiiu/pad_functions.o
+		OBJ += audio/drivers/wiiu_audio.o
+		OBJ += frontend/drivers/platform_wiiu.o
+	endif
+endif
+
+INCDIRS := -I$(ROOT_DIR)
+INCDIRS += -I$(ROOT_DIR)/deps
+INCDIRS += -I$(ROOT_DIR)/deps/stb
+INCDIRS += -I$(ROOT_DIR)/deps/libz
+INCDIRS += -I$(ROOT_DIR)/deps/7zip
+INCDIRS += -I$(LIBRETRO_COMM_DIR)/include
+INCDIRS += -I$(ROOT_DIR)/input/include
+INCDIRS += -I$(ROOT_DIR)/wiiu
+INCDIRS += -I$(ROOT_DIR)/wiiu/include
+INCDIRS += -isystem $(DEVKITPRO)/portlibs/ppc/include
+
+DEFINES += -D__wiiu__ -DWIIU -DMSB_FIRST -DHAVE_MAIN -DRARCH_CONSOLE
+ifneq ($(PC_DEVELOPMENT_TCP_PORT),)
+	DEFINES += -DPC_DEVELOPMENT_TCP_PORT=$(PC_DEVELOPMENT_TCP_PORT)
+endif
+
+FLAGS += -ffast-math -Werror=implicit-function-declaration
+
+ifeq ($(DEBUG), 1)
+	FLAGS += -O0 -g
+else
+	FLAGS += -O3
+endif
+FLAGS += $(INCDIRS) $(DEFINES)
+
+CFLAGS += $(FLAGS)
+CXXFLAGS += $(FLAGS) -fno-rtti -fno-exceptions
+ASFLAGS += $(FLAGS)
+
+ifeq ($(WHOLE_ARCHIVE_LINK), 1)
+	WHOLE_START := -Wl,--whole-archive
+	WHOLE_END := -Wl,--no-whole-archive
+endif
+
+LDFLAGS += -Wl,--gc-sections
+LDFLAGS += -L$(ROOT_DIR) $(WHOLE_START) -lretro_wiiu $(WHOLE_END)
+LDFLAGS += -L$(DEVKITPRO)/portlibs/ppc/lib
+LDFLAGS += -lm -lpng -lz
+
+ifneq ($(WANT_LIBFAT), 1)
+	LDFLAGS += -lfat
+endif
+
+ifneq ($(WANT_IOSUHAX), 1)
+	LDFLAGS += -liosuhax
+endif
+
+WUT_NO_COMPRULES = 1
+WUT_NO_DEPEND_INCS = 1
+include /home/ash/Code/wut/share/wut.mk
+
+DEPFLAGS = -MT $@ -MMD -MP -MF $(BUILD_DIR)/$*.depend
+
+$(BUILD_DIR)/%.o: %.cpp %.depend
+	@$(if $(Q), echo CXX $<,)
+	@mkdir -p $(dir $@)
+	$(Q)$(CXX) -c -o $@ $< $(CXXFLAGS) $(DEPFLAGS)
+
+$(BUILD_DIR)/%.o: %.c %.depend
+	@$(if $(Q), echo CC $<,)
+	@mkdir -p $(dir $@)
+	$(Q)$(CC) -c -o $@ $< $(CFLAGS) $(DEPFLAGS)
+
+$(BUILD_DIR)/%.o: %.S %.depend
+	@$(if $(Q), echo AS $<,)
+	@mkdir -p $(dir $@)
+	$(Q)$(CC) -c -o $@ $< $(ASFLAGS) $(DEPFLAGS)
+
+$(BUILD_DIR)/%.o: %.s %.depend
+	@$(if $(Q), echo AS $<,)
+	@mkdir -p $(dir $@)
+	$(Q)$(CC) -c -o $@ $< $(ASFLAGS) $(DEPFLAGS)
+%.a:
+	@$(if $(Q), echo AR $<,)
+	@mkdir -p $(dir $@)
+	$(Q)$(AR) -rc $@ $^
+%.depend: ;
+#%.last: ;
+.PRECIOUS: %.depend %.last
+
+%: $(BUILD_DIR)/%
+	cp $< $@
+
+# libretro_wiiu.a ???
+$(BUILD_DIR)/$(TARGET).rpx: $(OBJ)
+all: $(TARGET).rpx
+.PHONY: all
+
+clean:
+	$(Q)rm -f $(OBJ) $(TARGET).rpx $(BUILD_DIR)/$(TARGET).rpx $(OBJ:.o=.depend)
+.PHONY: clean
+
+-include $(OBJ:.o=.depend)
