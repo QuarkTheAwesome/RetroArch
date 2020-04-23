@@ -346,6 +346,23 @@ int _FAT_open_r (struct _reent *r, void *fileStruct, const char *path, int flags
 	file->prevOpenFile = NULL;
 	partition->firstOpenFile = file;
 
+#ifdef WIIU_LOG_FS
+        OSCalendarTime ctime;
+        OSTicksToCalendarTime(OSGetTime(), &ctime);
+        file->ctime_open = ctime;
+        printf("[fs-lfat] %02d:%02d:%02d.%03d%03d open(%s, \"%c%c%c\") -> %p\n",
+          ctime.tm_hour,
+          ctime.tm_min,
+          ctime.tm_sec,
+          ctime.tm_msec,
+          ctime.tm_usec,
+          path,
+          (file->read)   ? 'r':' ',
+          (file->write)  ? 'w':' ',
+          (file->append) ? 'a':' ',
+          file);
+#endif
+
 	_FAT_unlock(&partition->lock);
 
 	return (int) file;
@@ -435,6 +452,23 @@ int _FAT_close_r (struct _reent *r, void *fd) {
 	} else {
 		file->partition->firstOpenFile = file->nextOpenFile;
 	}
+
+   #ifdef WIIU_LOG_FS
+           OSCalendarTime ctime;
+           OSTicksToCalendarTime(OSGetTime(), &ctime);
+           printf("[fs-lfat] %02d:%02d:%02d.%03d%03d close(%p) -> %d, opened %02d:%02d:%02d.%03d%03d\n",
+             ctime.tm_hour,
+             ctime.tm_min,
+             ctime.tm_sec,
+             ctime.tm_msec,
+             ctime.tm_usec,
+             file, ret,
+             file->ctime_open.tm_hour,
+             file->ctime_open.tm_min,
+             file->ctime_open.tm_sec,
+             file->ctime_open.tm_msec,
+             file->ctime_open.tm_usec);
+   #endif
 
 	_FAT_unlock(&file->partition->lock);
 

@@ -23,6 +23,7 @@
  ***************************************************************************/
 #include <string.h>
 #include <malloc.h>
+#include <stdio.h>
 #include "iosuhax.h"
 #include "iosuhax_disc_interface.h"
 
@@ -112,6 +113,10 @@ static bool IOSUHAX_sdio_startup(void)
             IOSUHAX_disc_io_fsa_close(FSA_REF_SD);
             sdioFd = -1;
         }
+
+        #ifdef WIIU_LOG_FS
+           printf("[fs-iosu] mounted %s with IOSUHAX+libfat devoptab (%i)\n", "/dev/sdcard01", sdioFd);
+        #endif
     }
 
     return (sdioFd >= 0);
@@ -195,6 +200,14 @@ static bool IOSUHAX_usb_startup(void)
                 IOSUHAX_disc_io_fsa_close(FSA_REF_USB);
                 usbFd = -1;
             }
+
+            #ifdef WIIU_LOG_FS
+               printf("[fs-iosu] mounted %s with IOSUHAX+libfat devoptab (%i)\n", "/dev/usb02", usbFd);
+            #endif
+        } else {
+           #ifdef WIIU_LOG_FS
+             printf("[fs-iosu] mounted %s with IOSUHAX+libfat devoptab (%i)\n", "/dev/usb01", usbFd);
+          #endif
         }
     }
     return (usbFd >= 0);

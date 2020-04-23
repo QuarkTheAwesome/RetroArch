@@ -62,6 +62,10 @@ int MountFS(void *pClient, void *pCmd, char **mount_path)
       }
    }
 
+#ifdef WIIU_LOG_FS
+   printf("[fs-wiiu] mounted %s with Cafe/HBL devoptab\n", mountPath);
+#endif
+
    free(mountPath);
    free(mountSrc);
    return result;

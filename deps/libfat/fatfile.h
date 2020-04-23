@@ -1,11 +1,11 @@
 /*
  fatfile.h
- 
- Functions used by the newlib disc stubs to interface with 
+
+ Functions used by the newlib disc stubs to interface with
  this library
 
  Copyright (c) 2006 Michael "Chishm" Chisholm
-	
+
  Redistribution and use in source and binary forms, with or without modification,
  are permitted provided that the following conditions are met:
 
@@ -34,6 +34,8 @@
 
 #include <sys/reent.h>
 #include <sys/stat.h>
+#include <wiiu/os/time.h>
+#include <stdio.h>
 
 #include "common.h"
 #include "partition.h"
@@ -65,6 +67,7 @@ struct _FILE_STRUCT {
 	bool                 append;
 	bool                 inUse;
 	bool                 modified;
+   OSCalendarTime ctime_open;
 };
 
 typedef struct _FILE_STRUCT FILE_STRUCT;

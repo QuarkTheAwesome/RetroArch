@@ -35,6 +35,10 @@ typedef struct
    int32_t tm_mday;
    int32_t tm_mon;
    int32_t tm_year;
+   int32_t tm_wday;
+   int32_t tm_yday;
+   int32_t tm_msec;
+   int32_t tm_usec;
 }OSCalendarTime;
 
 OSTime OSGetTime();

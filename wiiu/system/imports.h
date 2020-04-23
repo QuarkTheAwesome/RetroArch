@@ -44,6 +44,7 @@ IMPORT(OSIsMainCore);
 IMPORT(OSGetSystemTime);
 IMPORT(OSGetSystemTick);
 IMPORT(OSGetTime);
+IMPORT(OSTicksToCalendarTime);
 IMPORT(OSGetSymbolName);
 IMPORT(OSGetSharedData);
 IMPORT(OSEffectiveToPhysical);

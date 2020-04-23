@@ -32,6 +32,7 @@
 #include "fs_utils.h"
 #include <wiiu/os/mutex.h>
 #include <wiiu/fs.h>
+#include <wiiu/os/time.h>
 
 #define FS_ALIGNMENT            0x40
 #define FS_ALIGN(x)             (((x) + FS_ALIGNMENT - 1) & ~(FS_ALIGNMENT - 1))
@@ -73,6 +74,7 @@ typedef struct _sd_fat_file_state_t {
     bool append;                                /* True if allowed to append to file */
     u64 pos;                                    /* Current position within the file (in bytes) */
     u64 len;                                    /* Total length of the file (in bytes) */
+    OSCalendarTime ctime_open;
     struct _sd_fat_file_state_t *prevOpenFile;  /* The previous entry in a double-linked FILO list of open files */
     struct _sd_fat_file_state_t *nextOpenFile;  /* The next entry in a double-linked FILO list of open files */
 } sd_fat_file_state_t;
@@ -194,6 +196,20 @@ static int sd_fat_open_r (struct _reent *r, void *fileStruct, const char *path, 
         file->fd = fd;
         file->pos = 0;
         file->len = stats.size;
+
+#ifdef WIIU_LOG_FS
+        OSCalendarTime ctime;
+        OSTicksToCalendarTime(OSGetTime(), &ctime);
+        file->ctime_open = ctime;
+        printf("[fs-wiiu] %02d:%02d:%02d.%03d%03d open(%s, \"%s\") -> %08x/%p\n",
+          ctime.tm_hour,
+          ctime.tm_min,
+          ctime.tm_sec,
+          ctime.tm_msec,
+          ctime.tm_usec,
+          real_path, mode_str, fd, file);
+#endif
+
         OSUnlockMutex(dev->pMutex);
         return (int)file;
     }
@@ -214,6 +230,23 @@ static int sd_fat_close_r (struct _reent *r, void* fd)
     OSLockMutex(file->dev->pMutex);
 
     int result = FSCloseFile(file->dev->pClient, file->dev->pCmd, file->fd, -1);
+
+    #ifdef WIIU_LOG_FS
+            OSCalendarTime ctime;
+            OSTicksToCalendarTime(OSGetTime(), &ctime);
+            printf("[fs-wiiu] %02d:%02d:%02d.%03d%03d close(%08x/%p) -> %d, opened %02d:%02d:%02d.%03d%03d\n",
+              ctime.tm_hour,
+              ctime.tm_min,
+              ctime.tm_sec,
+              ctime.tm_msec,
+              ctime.tm_usec,
+              file->fd, file, result,
+              file->ctime_open.tm_hour,
+              file->ctime_open.tm_min,
+              file->ctime_open.tm_sec,
+              file->ctime_open.tm_msec,
+              file->ctime_open.tm_usec);
+    #endif
 
     OSUnlockMutex(file->dev->pMutex);
 
